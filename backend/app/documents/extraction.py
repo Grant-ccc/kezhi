@@ -1,5 +1,6 @@
 """Validate supported documents without rendering uploaded markup or selecting models."""
 from io import BytesIO
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 import re
 
@@ -10,7 +11,13 @@ from app.core.errors import BusinessError
 MAX_TEXT_CHARS = 1_000_000
 
 
-def validate_file(filename: str, data: bytes) -> tuple[str, str]:
+@dataclass(frozen=True)
+class TextPage:
+    text: str
+    page_number: int | None = None
+
+
+def extract_pages(filename: str, data: bytes) -> tuple[str, str, list[TextPage]]:
     name = PurePosixPath(filename.replace("\\", "/")).name
     name = re.sub(r"[\x00-\x1f\x7f]", "_", name)
     if not name or len(name) > 200:
@@ -31,21 +38,23 @@ def validate_file(filename: str, data: bytes) -> tuple[str, str]:
                 raise BusinessError(415, "ENCRYPTED_PDF", "暂不支持加密 PDF，请先解密再上传")
             if len(reader.pages) > 200:
                 raise BusinessError(413, "PDF_TOO_LONG", "PDF 最多支持 200 页")
-            length = 0
-            for page in reader.pages:
+            length, pages = 0, []
+            for number, page in enumerate(reader.pages, 1):
                 contents = page.get_contents()
                 if contents is not None and len(contents.get_data()) > 2 * 1024 * 1024:
                     raise BusinessError(413, "PDF_PAGE_TOO_COMPLEX", "PDF 页面过于复杂，请拆分文件后上传")
-                length += len((page.extract_text() or "").strip())
+                text = (page.extract_text() or "").replace("\r\n", "\n").replace("\r", "\n")
+                length += len(text)
+                pages.append(TextPage(text, number))
                 if length > MAX_TEXT_CHARS:
                     raise BusinessError(413, "TEXT_TOO_LONG", "正文过长，请按章节拆分后上传")
-            if not length:
+            if not any(page.text.strip() for page in pages):
                 raise BusinessError(422, "NO_EXTRACTABLE_TEXT", "没有可提取正文，扫描件暂不支持，请使用文本型 PDF")
         except BusinessError:
             raise
         except Exception:
             raise BusinessError(422, "INVALID_PDF", "PDF 解析失败，请检查文件是否完整") from None
-        return name, "application/pdf"
+        return name, "application/pdf", pages
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -56,4 +65,10 @@ def validate_file(filename: str, data: bytes) -> tuple[str, str]:
         raise BusinessError(422, "NO_EXTRACTABLE_TEXT", "文件没有可用正文")
     if len(text) > MAX_TEXT_CHARS:
         raise BusinessError(413, "TEXT_TOO_LONG", "正文过长，请按章节拆分后上传")
-    return name, "text/markdown" if suffix == ".md" else "text/plain"
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return name, "text/markdown" if suffix == ".md" else "text/plain", [TextPage(text)]
+
+
+def validate_file(filename: str, data: bytes) -> tuple[str, str]:
+    name, media_type, _ = extract_pages(filename, data)
+    return name, media_type

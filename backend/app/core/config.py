@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     demo_password: str
     storage_dir: Path = ROOT / "storage/uploads"
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1, le=50 * 1024 * 1024)
+    worker_lease_seconds: int = Field(default=30, ge=3, le=3600)
+    worker_max_attempts: int = Field(default=3, ge=1, le=10)
+    worker_retry_base_seconds: int = Field(default=5, ge=1, le=300)
+    worker_poll_seconds: float = Field(default=2, ge=0.1, le=60)
+    worker_task_timeout_seconds: int = Field(default=120, ge=1, le=3600)
 
 
 @lru_cache

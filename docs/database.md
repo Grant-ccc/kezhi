@@ -1,6 +1,6 @@
 # 课程学习助手数据库设计初稿
 
-版本：0.2。使用一个 SeekDB 数据库管理关系数据和向量。11 张业务表的 DDL 已在 SeekDB 1.4.0 初始化，外键、CHECK 和事务已验证；正式 embedding 列及向量索引待模型维度确定后迁移。以下仍包含后续资料与问答模块的目标设计，不表示业务接口均已完成。
+版本：0.3。使用一个 SeekDB 数据库管理关系数据和向量。11 张业务表及解析状态迁移已在 SeekDB 1.4.0 验证；正式 embedding 列及向量索引待模型确定后迁移。资料管理与解析 worker 已实现，问答仍是目标设计。
 
 ## ER 图
 
@@ -73,7 +73,7 @@ erDiagram
 - `title`、`original_filename`、`storage_key`、`media_type`、`size_bytes`、`content_hash`。
 - `upload_request_key`、`upload_payload_hash`：首次创建资料的幂等键和请求内容校验值；唯一约束 `(owner_id, upload_request_key)`。
 - `content_version`：正文版本，从 1 开始；替换正文递增，改标题不递增。
-- `status`：PROCESSING / READY / FAILED / DELETED。
+- `status`：PROCESSING / PARSED / READY / FAILED / DELETED；PARSED 仅表示正文已解析。
 - `error_code`、`error_detail`（返回前去除内部路径等敏感细节）。
 - `created_at`、`updated_at`、`deleted_at`（可空）。
 
@@ -101,7 +101,7 @@ TEACHING 的所有者须为该课任课教师；NOTE 的所有者须为该课有
 
 - `id`：主键；`document_id` → documents；`content_version`。
 - `requested_by` → users；`request_key`、`payload_hash`：该版本创建或替换请求的幂等记录；唯一约束 `(requested_by, request_key)`。
-- `status`：PENDING / RUNNING / SUCCEEDED / FAILED / CANCELLED。
+- `status`：PENDING / RUNNING / PARSED / SUCCEEDED / FAILED / CANCELLED；本阶段任务结束于 PARSED，完整向量索引成功后才使用 SUCCEEDED。
 - `retry_round`、`attempt_count`、`next_run_at`、`lease_until`、`worker_token`、`error_code`、`created_at`、`updated_at`。
 - 唯一约束：`(document_id, content_version)`。
 

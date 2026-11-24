@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.core.config import get_settings
 from app.core.errors import BusinessError
@@ -68,3 +68,18 @@ def document_rename(document_id: int, payload: RenamePayload, user: User):
 @router.delete("/documents/{document_id}")
 def document_delete(document_id: int, user: User):
     return documents.delete_document(user, document_id)
+
+
+class RetryPayload(BaseModel):
+    expected_version: int = Field(strict=True, ge=1)
+    expected_retry_round: int = Field(strict=True, ge=0)
+
+
+@router.post("/documents/{document_id}/retry")
+def document_retry(document_id: int, payload: RetryPayload, user: User):
+    return documents.retry_document(user, document_id, payload.expected_version, payload.expected_retry_round)
+
+
+@router.get("/documents/{document_id}/chunks")
+def document_chunks(document_id: int, user: User, page: int = Query(default=1, ge=1, le=10000)):
+    return documents.chunk_preview(user, document_id, page)

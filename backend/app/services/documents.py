@@ -54,9 +54,17 @@ def present(document: dict, user: dict, cursor):
     result["can_manage"] = document["owner_id"] == user["id"] if document["kind"] == "NOTE" else user["role"] == "TEACHER"
     cursor.execute("SELECT id FROM enrollments WHERE course_id=%s AND student_id=%s AND status='ACTIVE'", (document["course_id"], user["id"]))
     result["can_replace"] = result["can_manage"] and (user["role"] == "TEACHER" or cursor.fetchone() is not None)
-    cursor.execute("SELECT status FROM index_jobs WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
+    cursor.execute("SELECT status,attempt_count,retry_round,next_run_at,error_code FROM index_jobs WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
     job = cursor.fetchone()
     result["index_status"] = job["status"] if job else None
+    result["attempt_count"] = job["attempt_count"] if job else 0
+    result["retry_round"] = job["retry_round"] if job else 0
+    result["next_run_at"] = job["next_run_at"] if job else None
+    result["can_retry"] = bool(result["can_replace"] and document["status"] == "FAILED" and job and job["status"] == "FAILED")
+    error_code = job["error_code"] if job else None
+    result["processing_error"] = ({"FILE_MISSING": "原文件缺失，请重新上传或替换", "FILE_CHANGED": "文件完整性校验失败，请替换原文件", "ATTEMPTS_EXHAUSTED": "处理多次中断，请确认服务正常后重试", "PROCESSING_FAILED": "处理暂时失败，将按计划重试或等待手动重试", "PROCESSING_TIMEOUT": "处理超时，请拆分文件后重试"}.get(error_code, "文件解析失败，请检查文件后重试") if error_code else None)
+    cursor.execute("SELECT COUNT(*) AS n FROM document_chunks WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
+    result["chunk_count"] = cursor.fetchone()["n"]
     return result
 
 
@@ -171,7 +179,7 @@ def save_document(user: dict, course_id: int, title: str, filename: str, data: b
             else:
                 cursor.execute("UPDATE documents SET title=%s,original_filename=%s,storage_key=%s,media_type=%s,size_bytes=%s,content_hash=%s,content_version=%s,status='PROCESSING',error_code=NULL,error_detail=NULL WHERE id=%s", (title, name, key, media_type, len(data), content_hash, version, document_id))
                 cursor.execute("UPDATE document_chunks SET is_current=FALSE WHERE document_id=%s", (document_id,))
-                cursor.execute("UPDATE index_jobs SET status='CANCELLED',worker_token=NULL,lease_until=NULL WHERE document_id=%s AND status IN ('PENDING','RUNNING','FAILED')", (document_id,))
+                cursor.execute("UPDATE index_jobs SET status='CANCELLED',worker_token=NULL,lease_until=NULL WHERE document_id=%s AND status IN ('PENDING','RUNNING','PARSED','FAILED')", (document_id,))
             cursor.execute("INSERT INTO index_jobs(document_id,content_version,requested_by,request_key,payload_hash) VALUES(%s,%s,%s,%s,%s)", (document_id, version, user["id"], request_key, payload_hash))
         return {"id": document_id, "content_version": version, "replayed": False}
     except Exception:
@@ -231,6 +239,38 @@ def delete_document(user: dict, document_id: int):
         authorize(cursor, user, document, write=True)
         cursor.execute("UPDATE documents SET status='DELETED',deleted_at=UTC_TIMESTAMP(6) WHERE id=%s", (document_id,))
         cursor.execute("UPDATE document_chunks SET is_current=FALSE WHERE document_id=%s", (document_id,))
-        cursor.execute("UPDATE index_jobs SET status='CANCELLED',worker_token=NULL,lease_until=NULL WHERE document_id=%s AND status IN ('PENDING','RUNNING','FAILED')", (document_id,))
+        cursor.execute("UPDATE index_jobs SET status='CANCELLED',worker_token=NULL,lease_until=NULL WHERE document_id=%s AND status IN ('PENDING','RUNNING','PARSED','FAILED')", (document_id,))
     # Retain original files for now; a separate retention/cleanup policy follows.
     return {"message": "资料已删除，访问权限已撤销"}
+
+
+def retry_document(user: dict, document_id: int, expected_version: int, expected_retry_round: int):
+    with transaction() as connection, connection.cursor() as cursor:
+        document = lookup(cursor, document_id)
+        lock_course(cursor, document["course_id"])
+        document = lookup(cursor, document_id, lock=True)
+        authorize(cursor, user, document, write=True, replace=True)
+        cursor.execute("SELECT * FROM index_jobs WHERE document_id=%s AND content_version=%s FOR UPDATE", (document_id, document["content_version"]))
+        job = cursor.fetchone()
+        if document["content_version"] != expected_version or not job or job["retry_round"] != expected_retry_round:
+            raise BusinessError(409, "RETRY_CONFLICT", "资料版本或重试轮次已变化，请刷新后重试")
+        if document["status"] != "FAILED" or job["status"] != "FAILED":
+            raise BusinessError(409, "RETRY_NOT_AVAILABLE", "只有处理失败的当前版本可以重试")
+        cursor.execute("UPDATE index_jobs SET status='PENDING',retry_round=retry_round+1,attempt_count=0,next_run_at=UTC_TIMESTAMP(6),lease_until=NULL,worker_token=NULL,error_code=NULL WHERE id=%s", (job["id"],))
+        cursor.execute("UPDATE documents SET status='PROCESSING',error_code=NULL,error_detail=NULL WHERE id=%s", (document_id,))
+    return {"message": "已重新加入处理队列"}
+
+
+def chunk_preview(user: dict, document_id: int, page: int = 1):
+    from app.documents.chunking import CHUNKING_PROFILE
+    with transaction() as connection, connection.cursor() as cursor:
+        document = lookup(cursor, document_id)
+        lock_course(cursor, document["course_id"])
+        document = lookup(cursor, document_id, lock=True)
+        authorize(cursor, user, document)
+        if document["status"] not in {"PARSED", "READY"}:
+            raise BusinessError(409, "PARSE_NOT_READY", "正文分块尚未准备好，请稍后刷新")
+        cursor.execute("SELECT chunk_index,content,page_number,section_title,char_start,char_end FROM document_chunks WHERE document_id=%s AND content_version=%s ORDER BY chunk_index LIMIT 20 OFFSET %s", (document_id, document["content_version"], (page - 1) * 20))
+        items = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) AS n FROM document_chunks WHERE document_id=%s AND content_version=%s", (document_id, document["content_version"]))
+        return {"items": items, "total": cursor.fetchone()["n"], "page": page, "page_size": 20, "content_version": document["content_version"], "chunking_profile": CHUNKING_PROFILE, "searchable": document["status"] == "READY"}

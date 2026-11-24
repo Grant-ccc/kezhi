@@ -27,6 +27,8 @@ def main():
         with connection.cursor() as cursor:
             for statement in statements(ROOT / "sql/001_schema.sql"):
                 cursor.execute(statement)
+        from app.migrate import apply_migrations
+        apply_migrations(connection)
         connection.begin()
         with connection.cursor() as cursor:
             password_hash = connection.escape(hasher.hash(settings.demo_password))

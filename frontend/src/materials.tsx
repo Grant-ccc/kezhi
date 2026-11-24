@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { BookOpen, BookMarked, ChevronLeft, CircleAlert, Download, FileText, FolderOpen, Library, LoaderCircle, LockKeyhole, MessageSquare, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import { api, type Material, type MaterialList, type User, type Workspace } from './api'
+import { api, type ChunkList, type Material, type MaterialList, type User, type Workspace } from './api'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : '操作失败，请稍后重试'
 const byteSize = (size: number) => size < 1024 ? `${size} B` : size < 1024 * 1024 ? `${(size/1024).toFixed(1)} KB` : `${(size/1024/1024).toFixed(1)} MB`
 function materialStatus(doc: Material) {
-  return doc.status === 'READY' ? '可检索' : doc.status === 'FAILED' ? '处理失败' : doc.index_status === 'PENDING' ? '已保存 · 待索引' : '处理中'
+  return doc.status === 'READY' ? '可检索' : doc.status === 'PARSED' ? '已解析 · 待向量化' : doc.status === 'FAILED' ? '处理失败' : doc.index_status === 'PENDING' ? (doc.attempt_count ? '等待自动重试' : '等待解析') : `正在解析 · 第 ${doc.attempt_count} 次`
 }
 
 function Modal({ title, children, onClose }: { title:string; children:ReactNode; onClose:()=>void }) {
@@ -61,6 +61,20 @@ function RenameDialog({ doc,onClose,onSaved }:{doc:Material;onClose:()=>void;onS
   return <Modal title="修改资料标题" onClose={()=>{if(!busy)onClose()}}><form onSubmit={submit}><label>资料标题<input value={title} required maxLength={255} onChange={e=>setTitle(e.target.value)}/></label>{error&&<p role="alert" className="error">{error}</p>}<div className="dialog-actions"><button type="button" className="button secondary" disabled={busy} onClick={onClose}>取消</button><button className="button primary" disabled={busy}>保存标题</button></div></form></Modal>
 }
 
+function ChunksDialog({doc,onClose}:{doc:Material;onClose:()=>void}) {
+  const [page,setPage]=useState(1)
+  const [data,setData]=useState<ChunkList|null>(null)
+  const [error,setError]=useState('')
+  useEffect(()=>{let cancelled=false;setData(null);setError('');api<ChunkList>(`/documents/${doc.id}/chunks?page=${page}`).then(value=>{if(!cancelled)setData(value)}).catch(error=>{if(!cancelled)setError(errorMessage(error))});return()=>{cancelled=true}},[doc.id,page])
+  return <Modal title="查看正文分块" onClose={onClose}>
+    <p className="dialog-copy">{doc.title} · 版本 {data?.content_version ?? doc.content_version}</p>
+    <p className="material-hint">当前是正文预处理结果；向量模型尚未接入，分块还不能用于智能检索。</p>
+    {error&&<p role="alert" className="error">{error}</p>}
+    {!data&&!error&&<p className="material-hint">正在读取分块…</p>}
+    {data&&<><p className="material-hint">共 {data.total} 个片段</p><div className="chunks-preview">{data.items.map(chunk=><section key={chunk.chunk_index} className="chunk-preview"><p>片段 {chunk.chunk_index+1}{chunk.page_number?` · 第 ${chunk.page_number} 页`:''}{chunk.section_title?` · ${chunk.section_title}`:''}</p><pre>{chunk.content}</pre></section>)}</div>{data.total>data.page_size&&<div className="pagination"><button className="button secondary" disabled={page===1} onClick={()=>setPage(page-1)}>上一页</button><span>{page}</span><button className="button secondary" disabled={page*data.page_size>=data.total} onClick={()=>setPage(page+1)}>下一页</button></div>}</>}
+  </Modal>
+}
+
 export function DocumentCollection({user,courseId,compact=false}:{user:User;courseId?:number;compact?:boolean}) {
   const [result,setResult]=useState<MaterialList>({items:[],total:0,page:1,page_size:24})
   const [page,setPage]=useState(1)
@@ -75,13 +89,16 @@ export function DocumentCollection({user,courseId,compact=false}:{user:User;cour
   const [deleting,setDeleting]=useState<Material|null>(null)
   const [busy,setBusy]=useState(false)
   const [preview,setPreview]=useState<{title:string;content:string}|null>(null)
+  const [chunks,setChunks]=useState<Material|null>(null)
+  const [retrying,setRetrying]=useState<number|null>(null)
   const serial=useRef(0)
-  async function load() {
-    const ticket=++serial.current;setLoading(true);setError('')
+  async function load(quiet=false) {
+    const ticket=++serial.current;if(!quiet)setLoading(true);setError('')
     try {const data=await api<MaterialList>(`/documents?page=${page}&q=${encodeURIComponent(search)}${courseId?`&course_id=${courseId}`:''}${kind==='ALL'?'':`&kind=${kind}`}`);if(ticket===serial.current)setResult(data)}catch(error){if(ticket===serial.current)setError(errorMessage(error))}finally{if(ticket===serial.current)setLoading(false)}
   }
   useEffect(()=>{setPage(1);setKind('ALL')},[courseId])
   useEffect(()=>{void load();return()=>{serial.current++}},[courseId,page,search,kind])
+  useEffect(()=>{if(!result.items.some(doc=>doc.status==='PROCESSING'))return;const timer=setInterval(()=>{void load(true)},3000);return()=>clearInterval(timer)},[result.items,courseId,page,search,kind])
   async function saved() {setUpload(null);setRename(null);setNotice('资料已保存');await load()}
   async function remove() {
     if(!deleting)return;setBusy(true);setError('')
@@ -91,20 +108,25 @@ export function DocumentCollection({user,courseId,compact=false}:{user:User;cour
     setError('')
     try{setPreview(await api<{title:string;content:string}>(`/documents/${doc.id}/preview`))}catch(error){setError(errorMessage(error))}
   }
+  async function retry(doc:Material) {
+    setRetrying(doc.id);setError('')
+    try{await api(`/documents/${doc.id}/retry`,{method:'POST',body:JSON.stringify({expected_version:doc.content_version,expected_retry_round:doc.retry_round})});setNotice('已重新加入解析队列');await load()}catch(error){setError(errorMessage(error))}finally{setRetrying(null)}
+  }
   const visible=result.items
   return <div className={compact?'document-collection compact':'document-collection'}>
-    <div className="material-toolbar"><span className="material-count">{result.total} 份资料</span><button className="icon-button" aria-label="刷新资料列表" onClick={load}><RefreshCw size={16}/></button>{courseId&&<button className="button primary" onClick={()=>setUpload(true)}><Plus size={16}/>{compact?'上传':user.role==='TEACHER'?'上传教学资料':'上传私人笔记'}</button>}</div>
+    <div className="material-toolbar"><span className="material-count">{result.total} 份资料</span><button className="icon-button" aria-label="刷新资料列表" onClick={()=>load()}><RefreshCw size={16}/></button>{courseId&&<button className="button primary" onClick={()=>setUpload(true)}><Plus size={16}/>{compact?'上传':user.role==='TEACHER'?'上传教学资料':'上传私人笔记'}</button>}</div>
     {courseId&&user.role==='STUDENT'&&<div className="material-filters"><button className={kind==='ALL'?'active':''} onClick={()=>{setPage(1);setKind('ALL')}}>全部</button><button className={kind==='TEACHING'?'active':''} onClick={()=>{setPage(1);setKind('TEACHING')}}>教师资料</button><button className={kind==='NOTE'?'active':''} onClick={()=>{setPage(1);setKind('NOTE')}}>我的笔记</button></div>}
     {!compact&&<form className="search material-search" onSubmit={e=>{e.preventDefault();setPage(1);setSearch(query)}}><Search size={17}/><input aria-label="搜索资料" value={query} placeholder="按资料标题搜索" onChange={e=>setQuery(e.target.value)}/><button type="submit">搜索</button></form>}
     {notice&&<p role="status" className="notice">{notice}<button className="icon-button" aria-label="关闭资料提示" onClick={()=>setNotice('')}><X size={15}/></button></p>}
     {error&&<p role="alert" className="error-banner"><CircleAlert size={17}/>{error}</p>}
-    {loading?<div className="loading-block"><LoaderCircle className="spin"/>正在读取资料</div>:visible.length===0?<div className="small-empty"><FolderOpen size={32}/><p>{kind==='TEACHING'?'还没有教师资料':kind==='NOTE'?'还没有私人笔记':'这里还没有资料'}</p><small>{courseId?'上传第一份资料，开始积累你的课程知识。':'在课程工作台上传后，你的资料会出现在这里。'}</small>{!courseId&&<Link className="button secondary" to="/courses">去课程中心</Link>}</div>:<div className="material-list">{visible.map(doc=><article className="material-card" key={doc.id}><div className={`file-emblem ${doc.kind==='NOTE'?'private':''}`}><FileText size={23}/></div><div className="material-body"><div className="material-heading"><h3>{doc.title}</h3><span className={`material-kind ${doc.kind==='NOTE'?'private':''}`}>{doc.kind==='NOTE'?<><LockKeyhole size={12}/>仅本人</>:'课程公共'}</span></div><p>{doc.course_name} · {doc.original_filename}</p><div className="material-meta"><span>{byteSize(doc.size_bytes)}</span><span>版本 {doc.content_version}</span><span>{materialStatus(doc)}</span></div><div className="material-actions"><a className="material-action" href={`/api/v1/documents/${doc.id}/download`}><Download size={14}/>下载</a>{doc.media_type!=='application/pdf'&&<button className="material-action" onClick={()=>openPreview(doc)}><BookOpen size={14}/>查看正文</button>}{doc.can_manage&&<><button className="material-action" onClick={()=>setRename(doc)}><Pencil size={14}/>改名</button>{doc.can_replace&&<button className="material-action" onClick={()=>setUpload(doc)}><RefreshCw size={14}/>替换</button>}<button className="material-action delete" onClick={()=>setDeleting(doc)}><Trash2 size={14}/>删除</button></>}</div></div></article>)}</div>}
+    {loading?<div className="loading-block"><LoaderCircle className="spin"/>正在读取资料</div>:visible.length===0?<div className="small-empty"><FolderOpen size={32}/><p>{kind==='TEACHING'?'还没有教师资料':kind==='NOTE'?'还没有私人笔记':'这里还没有资料'}</p><small>{courseId?'上传第一份资料，开始积累你的课程知识。':'在课程工作台上传后，你的资料会出现在这里。'}</small>{!courseId&&<Link className="button secondary" to="/courses">去课程中心</Link>}</div>:<div className="material-list">{visible.map(doc=><article className="material-card" key={doc.id}><div className={`file-emblem ${doc.kind==='NOTE'?'private':''}`}><FileText size={23}/></div><div className="material-body"><div className="material-heading"><h3>{doc.title}</h3><span className={`material-kind ${doc.kind==='NOTE'?'private':''}`}>{doc.kind==='NOTE'?<><LockKeyhole size={12}/>仅本人</>:'课程公共'}</span></div><p>{doc.course_name} · {doc.original_filename}</p><div className="material-meta"><span>{byteSize(doc.size_bytes)}</span><span>版本 {doc.content_version}</span><span>{materialStatus(doc)}</span>{doc.chunk_count>0&&<span>{doc.chunk_count} 个片段</span>}</div>{doc.processing_error&&<p className="processing-error">{doc.processing_error}</p>}<div className="material-actions"><a className="material-action" href={`/api/v1/documents/${doc.id}/download`}><Download size={14}/>下载</a>{doc.media_type!=='application/pdf'&&<button className="material-action" onClick={()=>openPreview(doc)}><BookOpen size={14}/>查看正文</button>}{(doc.status==='PARSED'||doc.status==='READY')&&<button className="material-action" onClick={()=>setChunks(doc)}><Library size={14}/>查看分块</button>}{doc.can_retry&&<button className="material-action" disabled={retrying===doc.id} onClick={()=>retry(doc)}><RefreshCw size={14}/>重试解析</button>}{doc.can_manage&&<><button className="material-action" onClick={()=>setRename(doc)}><Pencil size={14}/>改名</button>{doc.can_replace&&<button className="material-action" onClick={()=>setUpload(doc)}><RefreshCw size={14}/>替换</button>}<button className="material-action delete" onClick={()=>setDeleting(doc)}><Trash2 size={14}/>删除</button></>}</div></div></article>)}</div>}
     {result.total>result.page_size&&<div className="pagination"><button className="button secondary" disabled={page===1} onClick={()=>setPage(page-1)}>上一页</button><span>{page}</span><button className="button secondary" disabled={page*result.page_size>=result.total} onClick={()=>setPage(page+1)}>下一页</button></div>}
     <p className="material-hint"><LockKeyhole size={14}/>文件访问由服务端校验。检索索引与问答尚未开放。</p>
     {upload&&<UploadDialog user={user} courseId={upload===true?courseId!:upload.course_id} existing={upload===true?undefined:upload} onClose={()=>setUpload(null)} onSaved={saved}/>}
     {rename&&<RenameDialog doc={rename} onClose={()=>setRename(null)} onSaved={saved}/>}
     {deleting&&<Modal title="删除这份资料？" onClose={()=>{if(!busy)setDeleting(null)}}><p className="dialog-copy">「{deleting.title}」将从资料列表移除，文件下载与后续检索访问会立即停止。</p><div className="dialog-actions"><button className="button secondary" disabled={busy} onClick={()=>setDeleting(null)}>保留资料</button><button className="button danger" disabled={busy} onClick={remove}>确认删除</button></div></Modal>}
     {preview&&<Modal title={preview.title} onClose={()=>setPreview(null)}><pre className="document-preview">{preview.content}</pre></Modal>}
+    {chunks&&<ChunksDialog doc={chunks} onClose={()=>setChunks(null)}/>}
   </div>
 }
 

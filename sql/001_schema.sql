@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS documents (
  CONSTRAINT fk_document_course FOREIGN KEY(course_id) REFERENCES courses(id),
  CONSTRAINT fk_document_owner FOREIGN KEY(owner_id) REFERENCES users(id),
  CONSTRAINT chk_document_kind CHECK(kind IN ('TEACHING','NOTE')),
- CONSTRAINT chk_document_status CHECK(status IN ('PROCESSING','READY','FAILED','DELETED')),
+ CONSTRAINT chk_document_status_v2 CHECK(status IN ('PROCESSING','PARSED','READY','FAILED','DELETED')),
  CONSTRAINT chk_document_size CHECK(size_bytes>0),
  CONSTRAINT chk_document_version CHECK(content_version>0)
 ) DEFAULT CHARSET=utf8mb4;
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS index_jobs (
  KEY idx_pending_jobs(status,next_run_at),
  CONSTRAINT fk_job_document FOREIGN KEY(document_id) REFERENCES documents(id),
  CONSTRAINT fk_job_requester FOREIGN KEY(requested_by) REFERENCES users(id),
- CONSTRAINT chk_job_status CHECK(status IN ('PENDING','RUNNING','SUCCEEDED','FAILED','CANCELLED')),
+ CONSTRAINT chk_job_status_v2 CHECK(status IN ('PENDING','RUNNING','PARSED','SUCCEEDED','FAILED','CANCELLED')),
  CONSTRAINT chk_job_attempts CHECK(attempt_count>=0 AND retry_round>=0)
 ) DEFAULT CHARSET=utf8mb4;
 

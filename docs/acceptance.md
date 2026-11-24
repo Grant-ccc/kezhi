@@ -1,6 +1,6 @@
 # 课程学习助手验收与推进计划
 
-当前已完成课程业务基础与资料管理阶段，详见 [课程阶段记录](verification/milestone-01.md) 和 [资料阶段记录](verification/milestone-02.md)。下表仍是完整验收计划，worker 与 RAG 用例尚未执行，浏览器完整上传存在验证限制。不得将设计目标、预置数据或模拟响应写成已通过测试或真实用户成果。
+当前已完成课程业务、资料管理与解析 worker，详见 [课程阶段记录](verification/milestone-01.md)、[资料阶段记录](verification/milestone-02.md) 和 [解析阶段记录](verification/milestone-03.md)。下表仍是完整验收计划，真实向量检索与 RAG 尚未实现，浏览器完整上传仍有验证限制。不得将设计目标、预置数据或模拟响应写成已通过测试或真实用户成果。
 
 ## 实验要求对应
 
