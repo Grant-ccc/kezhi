@@ -1,0 +1,15 @@
+name: course-learning-assistant
+services:
+  seekdb:
+    image: ${SEEKDB_IMAGE:?Run scripts/setup_env.py first}
+    ports:
+      - "127.0.0.1:${DB_PORT:-2881}:2881"
+    environment:
+      ROOT_PASSWORD: ${SEEKDB_ROOT_PASSWORD:?Set the local root password}
+      MEMORY_LIMIT: 2G
+      CPU_COUNT: 2
+    volumes:
+      - seekdb_data:/var/lib/seekdb
+    restart: unless-stopped
+volumes:
+  seekdb_data:

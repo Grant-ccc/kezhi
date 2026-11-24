@@ -1,0 +1,39 @@
+{
+  "checked_at": "2026-11-24T07:23:26.885499+00:00",
+  "database": "course_probe_eadc98e06d64411796e0f62c7caa5fc1",
+  "checks": {
+    "primary_key": {
+      "passed": true,
+      "error_code": 1062
+    },
+    "unique": {
+      "passed": true,
+      "error_code": 1062
+    },
+    "foreign_key": {
+      "passed": true,
+      "error_code": 1452
+    },
+    "check": {
+      "passed": true,
+      "error_code": 3819
+    },
+    "rollback": {
+      "passed": true
+    },
+    "concurrent_last_seat": {
+      "passed": true,
+      "successful_requests": 1
+    },
+    "parameterized_authorized_vector_search": {
+      "passed": true,
+      "dimension": 3,
+      "note": "Synthetic vectors only; no model selected."
+    },
+    "deleted_visibility": {
+      "passed": true
+    }
+  },
+  "version": "5.7.25-OceanBase seekdb-v1.4.0.0",
+  "passed": true
+}

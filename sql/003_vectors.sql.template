@@ -1,0 +1,4 @@
+-- Do not execute until an Embedding model/profile is selected.
+-- Replace {{EMBEDDING_DIM}} with a validated positive integer.
+ALTER TABLE document_chunks ADD COLUMN embedding VECTOR({{EMBEDDING_DIM}});
+-- Exact vector ranking is the initial baseline. ANN indexes follow measured need.
