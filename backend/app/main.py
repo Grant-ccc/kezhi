@@ -16,8 +16,10 @@ from app.core.db import read_connection
 from app.core.errors import BusinessError
 from app.core.security import COOKIE_NAME, create_token, current_user, hasher, verify_password
 from app.services import courses
+from app.api.documents import router as document_router
 
 app = FastAPI(title="课程学习助手 API", version="0.1.0")
+app.include_router(document_router)
 logger = logging.getLogger(__name__)
 User = Annotated[dict, Depends(current_user)]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
@@ -89,7 +91,7 @@ class NewCourse(CoursePayload):
 def health():
     with read_connection() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT 1 AS ok")
-    return {"status": "ok", "database": "seekdb", "models_configured": False, "milestone": "courses"}
+    return {"status": "ok", "database": "seekdb", "models_configured": False, "milestone": "documents"}
 
 
 @app.post("/api/v1/auth/login")

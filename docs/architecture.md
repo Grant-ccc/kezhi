@@ -34,7 +34,7 @@ flowchart TD
 | `evals` | 评测集、评分规则、运行配置与结果 |
 | `docs` | 产品、架构、数据库和验收材料 |
 
-以上是完整目标目录。当前已实现 API、core 和课程 services 及 React 界面；repositories 尚未单独拆分，SQL 暂位于 courses 服务中。rag 和 workers 尚未实现，不能按完整目录推断功能完成。
+以上是完整目标目录。当前已实现 API、core、课程与资料 services、文件校验模块 documents 和 React 界面；repositories 尚未单独拆分，SQL 暂位于服务层。rag 和 workers 尚未实现，不能按完整目录推断功能完成。
 
 ## 技术选择与待定项
 
@@ -45,6 +45,7 @@ flowchart TD
 | 数据访问 | PyMySQL 和手写参数化 SQL，业务与向量操作经过统一模块 |
 | 数据库 | 优先 SeekDB Server + Docker 命名卷；先验证再固定镜像版本，不依赖 latest 重现 |
 | 文件 | 受控本地文件目录；元信息及所有权存数据库 |
+| 文件依赖 | python-multipart 处理表单，pypdf 校验文本型 PDF；TXT 和 Markdown 使用 UTF-8 校验 |
 | 登录 | 建议短时 JWT 放入 HttpOnly Cookie；状态与业务资格每次在后端检查，写请求校验 CSRF/来源，生产 HTTPS |
 | Embedding | 优先尝试本地中文模型；BGE-small-zh-v1.5 是候选，尚未锁定 |
 | 回答模型 | 云端付费 API，供应商与模型在真实问题评测后选择；Qwen 是候选而非决定 |

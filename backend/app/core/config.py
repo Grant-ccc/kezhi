@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     allowed_origins: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8000"
     demo_password: str
+    storage_dir: Path = ROOT / "storage/uploads"
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1, le=50 * 1024 * 1024)
 
 
 @lru_cache

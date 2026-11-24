@@ -6,7 +6,14 @@ export type Course = {
 }
 export type CoursePayload = { code?: string; name: string; description: string; capacity: number; enrollment_status: 'OPEN' | 'CLOSED' }
 export type CourseList = { items: Course[]; total: number; page: number; page_size: number }
-export type Workspace = { course: Pick<Course, 'id' | 'code' | 'name' | 'description'>; documents: {id:number;title:string;kind:string;status:string}[]; question_answering_available: boolean }
+export type Workspace = { course: Pick<Course, 'id' | 'code' | 'name' | 'description'>; question_answering_available: boolean }
+export type Material = {
+  id: number; course_id: number; owner_id: number; kind: 'TEACHING'|'NOTE'; title: string;
+  original_filename: string; media_type: string; size_bytes: number; content_version: number;
+  status: 'PROCESSING'|'READY'|'FAILED'|'DELETED'; created_at: string; updated_at: string;
+  course_name: string; can_manage: boolean; can_replace: boolean; index_status: string|null;
+}
+export type MaterialList = { items: Material[]; total:number; page:number; page_size:number }
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message) }
@@ -15,7 +22,7 @@ export class ApiError extends Error {
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     ...options, credentials: 'same-origin',
-    headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
+    headers: { ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
   })
   const data = await response.json().catch(() => ({ message: '服务响应异常，请稍后重试' }))
   if (!response.ok) throw new ApiError(response.status, data.code ?? 'REQUEST_FAILED', data.message ?? '请求失败')

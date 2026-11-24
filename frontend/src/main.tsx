@@ -1,8 +1,10 @@
+/// <reference types="vite/client" />
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { BookOpen, BookMarked, Search, Plus, Library, FileText, History, LogOut, ChevronRight, Check, X, Users, Settings2, LayoutGrid, LoaderCircle, MessageSquare, LockKeyhole, GraduationCap, Sparkles, CircleAlert, ChevronLeft } from 'lucide-react'
 import { api, ApiError, type Course, type CourseList, type CoursePayload, type User, type Workspace } from './api'
+import { CourseWorkspace, MaterialsPage } from './materials'
 import './styles.css'
 
 type AuthState = { user: User | null; refresh: () => Promise<void>; setUser: (user: User | null) => void }
@@ -46,12 +48,14 @@ function Login({ initialError }: { initialError: string }) {
 
 function Shell() {
   const { user, setUser } = useContext(Auth)
+  const currentLocation = useLocation()
+  const currentSection = currentLocation.pathname.startsWith("/materials") ? "资料与笔记" : "课程"
   const [logoutError, setLogoutError] = useState('')
   async function logout() {
     try { await api('/auth/logout', { method: 'POST' }); setUser(null) }
     catch (error) { setLogoutError(message(error)) }
   }
-  return <div className="app-shell"><aside className="sidebar"><Link to="/courses" className="logo-link"><Logo /></Link><p className="nav-label">学习空间</p><nav><NavLink to="/courses" end><LayoutGrid size={19} />课程中心</NavLink><NavLink to="/courses?mine=1" className={({ isActive }) => isActive && location.search.includes('mine=1') ? 'selected-mine' : ''}><BookMarked size={19} />我的课程</NavLink><span className="nav-disabled"><FileText size={19} />资料与笔记<small>待开放</small></span><span className="nav-disabled"><History size={19} />问答记录<small>待开放</small></span></nav><div className="sidebar-note"><BookOpen size={23} /><p>好的理解，<br />来自有依据的思考。</p><span>让每一份资料有所连接</span></div><div className="profile"><span className="avatar">{user!.display_name[0]}</span><span>{user!.display_name}<small>{user!.role === 'TEACHER' ? '教师空间' : '学生空间'}</small></span><button className="icon-button" aria-label="退出登录" title="退出登录" onClick={logout}><LogOut size={17} /></button></div>{logoutError && <p className="error">{logoutError}</p>}</aside><div className="main-column"><header className="topbar"><span className="breadcrumb">学习空间<ChevronRight size={14} /><strong>课程</strong></span><span className="edition">课程学习助手 <span>业务基础版</span></span></header><Routes><Route path="/courses" element={<Courses />} /><Route path="/courses/:courseId" element={<CourseWorkspace />} /><Route path="*" element={<Navigate to="/courses" replace />} /></Routes></div></div>
+  return <div className="app-shell"><aside className="sidebar"><Link to="/courses" className="logo-link"><Logo /></Link><p className="nav-label">学习空间</p><nav><NavLink to="/courses" end><LayoutGrid size={19} />课程中心</NavLink><NavLink to="/courses?mine=1" className={({ isActive }) => isActive && currentLocation.search.includes('mine=1') ? 'selected-mine' : ''}><BookMarked size={19} />我的课程</NavLink><NavLink to="/materials"><FileText size={19} />资料与笔记</NavLink><span className="nav-disabled"><History size={19} />问答记录<small>待开放</small></span></nav><div className="sidebar-note"><BookOpen size={23} /><p>好的理解，<br />来自有依据的思考。</p><span>让每一份资料有所连接</span></div><div className="profile"><span className="avatar">{user!.display_name[0]}</span><span>{user!.display_name}<small>{user!.role === 'TEACHER' ? '教师空间' : '学生空间'}</small></span><button className="icon-button" aria-label="退出登录" title="退出登录" onClick={logout}><LogOut size={17} /></button></div>{logoutError && <p className="error">{logoutError}</p>}</aside><div className="main-column"><header className="topbar"><span className="breadcrumb">学习空间<ChevronRight size={14} /><strong>{currentSection}</strong></span><span className="edition">课程学习助手 <span>资料管理版</span></span></header><Routes><Route path="/courses" element={<Courses />} /><Route path="/courses/:courseId" element={<CourseWorkspace user={user!} />} /><Route path="/materials" element={<MaterialsPage user={user!} />} /><Route path="*" element={<Navigate to="/courses" replace />} /></Routes></div></div>
 }
 
 function Courses() {
@@ -119,14 +123,7 @@ function CourseEditor({ course, onClose, onSaved }: { course: Course | 'new'; on
   return <Dialog title={isNew ? '创建一门新课程' : '管理课程'} onClose={() => { if (!busy) onClose() }}><form onSubmit={submit}>{isNew && <label>开课编号<input value={payload.code} required maxLength={64} pattern="[A-Za-z0-9_-]+" placeholder="如 DB-2026-FALL" onChange={e => setPayload({ ...payload, code: e.target.value })} /></label>}<label>课程名称<input value={payload.name} required maxLength={120} onChange={e => setPayload({ ...payload, name: e.target.value })} /></label><label>课程介绍<textarea rows={3} value={payload.description} maxLength={4000} onChange={e => setPayload({ ...payload, description: e.target.value })} /></label><div className="form-row"><label>课程容量<input type="number" min={1} max={10000} required value={payload.capacity} onChange={e => setPayload({ ...payload, capacity: Number(e.target.value) })} /></label><label>选课状态<select value={payload.enrollment_status} onChange={e => setPayload({ ...payload, enrollment_status: e.target.value as 'OPEN' | 'CLOSED' })}><option value="OPEN">开放选课</option><option value="CLOSED">关闭选课</option></select></label></div>{error && <p role="alert" className="error">{error}</p>}<div className="dialog-actions">{!isNew && <button type="button" className="text-button delete" disabled={busy} onClick={() => deleteConfirm ? remove() : setDeleteConfirm(true)}>{deleteConfirm ? '再次点击确认删除' : '删除空课程'}</button>}<button type="button" className="button secondary" disabled={busy} onClick={onClose}>取消</button><button className="button primary" disabled={busy}>{busy ? '正在保存' : '保存课程'}</button></div></form></Dialog>
 }
 
-function CourseWorkspace() {
-  const { courseId } = useParams()
-  const [data, setData] = useState<Workspace | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => { let cancelled = false; api<Workspace>(`/courses/${courseId}/workspace`).then(value => { if (!cancelled) setData(value) }).catch(error => { if (!cancelled) setError(message(error)) }); return () => { cancelled = true } }, [courseId])
-  if (error) return <main className="content"><Link className="back-link" to="/courses"><ChevronLeft size={17} />返回课程中心</Link><div role="alert" className="error-banner">{error}</div></main>
-  if (!data) return <div className="loading-block"><LoaderCircle className="spin" />正在打开课程</div>
-  return <main className="content workspace-content"><Link className="back-link" to="/courses"><ChevronLeft size={17} />返回课程中心</Link><div className="workspace-title"><div><p className="eyebrow">{data.course.code}</p><h1>{data.course.name}</h1></div><span className="label-tag">课程工作台</span></div><div className="workspace"><section className="materials-pane"><h2><Library size={18} />课程资料</h2><div className="pane-tabs"><span>教师资料</span><span>我的笔记</span></div>{data.documents.length ? data.documents.map(doc => <div className="document-row" key={doc.id}><FileText size={17} />{doc.title}<small>{doc.status}</small></div>) : <div className="small-empty"><FileText size={30} /><p>这里还没有资料</p><small>资料上传功能将在下一阶段开放。</small></div>}</section><section className="question-pane"><div className="question-header"><MessageSquare size={18} /><span>课程问答</span><span className="muted">准备中</span></div><div className="question-empty"><span className="question-symbol"><Sparkles size={29} strokeWidth={1.4} /></span><h2>从一个问题，<br />连接你的课程资料。</h2><p>结合老师的讲义与自己的笔记，<br />让每个回答都有可以核对的依据。</p><span className="availability-note">资料检索与模型问答尚未接入</span></div><div className="question-input"><textarea aria-label="课程问题" placeholder="资料与问答功能开放后，在这里提出你的问题…" disabled /><span><LockKeyhole size={13} />仅使用你有权访问的资料</span></div></section><section className="citations-pane"><h2><BookOpen size={18} />引用来源</h2><div className="small-empty"><BookMarked size={30} /><p>把答案放回原文</p><small>问答功能开放后，引用片段会显示在这里。</small></div></section></div></main>
-}
+const root = ReactDOM.createRoot(document.getElementById('root')!)
+root.render(<React.StrictMode><BrowserRouter><App /></BrowserRouter></React.StrictMode>)
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><BrowserRouter><App /></BrowserRouter></React.StrictMode>)
+if (import.meta.hot) import.meta.hot.dispose(() => root.unmount())
