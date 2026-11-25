@@ -1,0 +1,30 @@
+{
+  "version": "0.1",
+  "purpose": "User-reviewed insufficient-evidence behavior; expected behavior only, not a real model run.",
+  "cases": [
+    {
+      "case_id": "outside_course_weather_001",
+      "provenance": "synthetic",
+      "review": {
+        "date": "2026-11-25",
+        "method": "User selected: report insufficient course evidence and suggest another question or supporting materials.",
+        "scope": "Course materials contain database knowledge; a weather forecast question has no supporting course evidence."
+      },
+      "fixture_reference": "retrieval-v0.1.json#transfer_atomicity_001",
+      "question": "明天上海会下雨吗？",
+      "expected": {
+        "authorized_document_ids": ["A", "B", "C"],
+        "relevant_document_ids": [],
+        "forbidden_document_ids": ["D"],
+        "answer_status": "INSUFFICIENT_EVIDENCE",
+        "required_behaviors": ["Explain that course materials cannot support an answer", "Suggest a course-related question or adding supporting materials"],
+        "forbidden_behaviors": ["Invent a weather forecast", "Provide an ungrounded general-knowledge answer", "Cite unrelated course passages as evidence", "Reveal another student's private notes"],
+        "citation_document_ids": [],
+        "human_authored_example_answer": "当前课程资料不足以回答这个问题。你可以提出课程相关问题，或补充能够支持该问题的资料。",
+        "example_provenance": "Assistant-written illustration of the selected behavior; not a generated model answer or exact-match target."
+      },
+      "implementation_status": "not_implemented_or_run",
+      "undecided": ["evidence_sufficiency_detection", "similarity_threshold_calibration", "clarification_interaction"]
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "checked_at": "2026-11-25T06:27:21.222219+00:00",
+  "case_id": "transfer_atomicity_001",
+  "vector_source": "real_bailian_api",
+  "fixture_sha256": "9632f2e8a3c4feb8cb7464194bb7db235bddcceb2060a564010630eb2fc31589",
+  "question": "为什么转账不能只扣钱，不加钱？程序中途出错怎么办？",
+  "calls": [
+    {
+      "kind": "document",
+      "requested_model": "qwen3.7-text-embedding",
+      "vector_count": 4,
+      "dimensions": 1024,
+      "total_tokens": 163,
+      "request_id": "692ae9eb-7767-9a11-926d-a672050d5098",
+      "elapsed_ms": 1022
+    },
+    {
+      "kind": "query",
+      "requested_model": "qwen3.7-text-embedding",
+      "vector_count": 1,
+      "dimensions": 1024,
+      "total_tokens": 31,
+      "request_id": "99bbcdf2-e037-9d03-bd77-ffd066fe1209",
+      "elapsed_ms": 1327
+    }
+  ],
+  "checks": {
+    "candidate_scope": true,
+    "relevant_set": true,
+    "forbidden_excluded": true,
+    "deleted": true,
+    "status_deleted": true,
+    "replaced_version": true,
+    "not_current": true,
+    "different_profile": true,
+    "parsed_not_ready": true,
+    "wrong_course": true,
+    "withdrawn": true,
+    "disabled": true,
+    "teacher_no_private_notes": true,
+    "other_student_own_notes_only": true,
+    "unenrolled_student": true,
+    "unassigned_teacher": true
+  },
+  "temporary_database_cleaned": true,
+  "scope": "Single synthetic case on the business schema in an isolated database; no production ingestion, HTTP authorization, generation or follow-up policy evaluated.",
+  "seekdb_version": "5.7.25-OceanBase seekdb-v1.4.0.0",
+  "profile": "bailian:cn-beijing:qwen3.7-text-embedding:1024:dense:query-document-v1:raw",
+  "retrieval_ms": 33,
+  "authorized_candidate_ids": [
+    "A",
+    "B",
+    "C"
+  ],
+  "results": [
+    {
+      "document_id": "B",
+      "rank": 1,
+      "cosine_distance": 0.29830841432162514
+    },
+    {
+      "document_id": "A",
+      "rank": 2,
+      "cosine_distance": 0.5462273872684136
+    }
+  ],
+  "metrics": {
+    "recall_at_2": 1.0,
+    "precision_at_2": 1.0,
+    "case_count": 1,
+    "not_general_accuracy": true
+  },
+  "visibility_variants": [
+    {
+      "name": "deleted",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "status_deleted",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "replaced_version",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "not_current",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "different_profile",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "parsed_not_ready",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "wrong_course",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "withdrawn",
+      "candidate_ids": [],
+      "returned_ids": [],
+      "passed": true
+    },
+    {
+      "name": "disabled",
+      "candidate_ids": [],
+      "returned_ids": [],
+      "passed": true
+    },
+    {
+      "name": "teacher_no_private_notes",
+      "candidate_ids": [
+        "A",
+        "C"
+      ],
+      "returned_ids": [
+        "A",
+        "C"
+      ],
+      "passed": true
+    },
+    {
+      "name": "other_student_own_notes_only",
+      "candidate_ids": [
+        "A",
+        "C",
+        "D"
+      ],
+      "returned_ids": [
+        "D",
+        "A"
+      ],
+      "passed": true
+    },
+    {
+      "name": "unenrolled_student",
+      "candidate_ids": [],
+      "returned_ids": [],
+      "passed": true
+    },
+    {
+      "name": "unassigned_teacher",
+      "candidate_ids": [],
+      "returned_ids": [],
+      "passed": true
+    }
+  ],
+  "reported_total_tokens": 194,
+  "actual_billed_amount": null,
+  "passed": true
+}

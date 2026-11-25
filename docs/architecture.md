@@ -47,7 +47,7 @@ flowchart TD
 | 文件 | 受控本地文件目录；元信息及所有权存数据库 |
 | 文件依赖 | python-multipart 处理表单，pypdf 校验文本型 PDF；TXT 和 Markdown 使用 UTF-8 校验 |
 | 登录 | 建议短时 JWT 放入 HttpOnly Cookie；状态与业务资格每次在后端检查，写请求校验 CSRF/来源，生产 HTTPS |
-| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维，适配层与两次真实连通检查通过，SeekDB 检索待验证 |
+| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维；独立临时库的单题真实 SeekDB 检索通过，正式向量发布尚未实现 |
 | 回答模型 | 用户已同意使用 DeepSeek，具体模型待验证；回答适配器尚未实现 |
 | RAG 编排 | 用清晰的 Python 流程函数实现，首版不引入额外编排框架 |
 | 测试 | pytest + 真实 SeekDB 集成测试 + 浏览器关键流程验证 |
@@ -83,6 +83,8 @@ worker 使用持久化任务和过期租约恢复；不能只靠 FastAPI 进程�
 9. 写入答案、证据和实际可得的耗时/用量；读取历史时再次检查全部实际发送片段的权限和版本。引用是证据的展示子集，不能代替答案依赖清单。
 
 首版小数据集优先验证带授权条件的精确向量查询。确有性能需求后再评测 ANN 或混合检索，不能为性能省略候选权限限制。
+
+当前已在独立临时库验证这条路径的 SQL：app/retrieval/search.py 由候选检查和排序共用授权条件，角色和资格从库内用户、选课及授课记录判断。app/evaluation/retrieval.py 运行 A/B 自编用例，真实返回 B/A，13 个状态变体通过，见 [实验记录](verification/milestone-05.md)。尚未暴露检索 HTTP 接口或修改正式库向量结构；正式接口仍需使用可信登录身份并完成发送前、保存前及历史读取时的再次校验。
 
 ## 模型调用边界
 

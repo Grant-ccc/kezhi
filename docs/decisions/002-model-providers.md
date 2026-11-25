@@ -27,6 +27,8 @@
 
 同日后续验证：用户配置完成，两次固定短文本真实调用通过，均返回 1024 维向量，报告总用量 50 Token。详见 [连通检查结果](../verification/embedding-connectivity.json)。这项结果只确认接口与向量结构，A/B 检索实验仍待执行。
 
+之后的首轮 A/B 实验在独立临时库中实际返回 B/A，D 在候选阶段排除，详见 [检索实验记录](../verification/milestone-05.md)。这更新了前述待验证状态，但样本只有一道自编题，不能据此宣称模型整体效果最优；正式资料向量发布和 DeepSeek 回答仍未实现。
+
 ## 官方依据
 
 - [百炼向量化指南](https://help.aliyun.com/zh/model-studio/embedding)：模型、维度及 query/document 角色说明。
