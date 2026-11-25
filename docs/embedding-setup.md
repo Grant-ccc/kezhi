@@ -15,6 +15,8 @@ DASHSCOPE_WORKSPACE_ID=在本地填写对应业务空间ID
 
 其余初始配置见 `.env.example`：地域 `cn-beijing`，模型 `qwen3.7-text-embedding`，维度 `1024`。若账号使用新加坡地域，设置 `DASHSCOPE_REGION=ap-southeast-1` 并使用匹配配置；不要仅更改地域来复用北京 Key。
 
+`DASHSCOPE_WORKSPACE_ID` 只填写 ID 本身。若复制到的是 `某个ID.cn-beijing.maas.aliyuncs.com`，应只保留 `.cn-beijing.maas.aliyuncs.com` 之前的部分；不要填写完整域名、URL 或“默认业务空间”这个名称。
+
 没有免费额度时可先查看控制台计费设置和余额，再决定是否进行真实检查；本项目不会自动充值。待向量化的文本会发送到百炼。
 
 ## 先检查配置，再检查连通

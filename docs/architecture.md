@@ -47,7 +47,7 @@ flowchart TD
 | 文件 | 受控本地文件目录；元信息及所有权存数据库 |
 | 文件依赖 | python-multipart 处理表单，pypdf 校验文本型 PDF；TXT 和 Markdown 使用 UTF-8 校验 |
 | 登录 | 建议短时 JWT 放入 HttpOnly Cookie；状态与业务资格每次在后端检查，写请求校验 CSRF/来源，生产 HTTPS |
-| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维，适配层已实现，真实调用与检索待验证 |
+| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维，适配层与两次真实连通检查通过，SeekDB 检索待验证 |
 | 回答模型 | 用户已同意使用 DeepSeek，具体模型待验证；回答适配器尚未实现 |
 | RAG 编排 | 用清晰的 Python 流程函数实现，首版不引入额外编排框架 |
 | 测试 | pytest + 真实 SeekDB 集成测试 + 浏览器关键流程验证 |

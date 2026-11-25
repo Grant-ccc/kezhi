@@ -25,6 +25,8 @@
 
 现有资料 worker 未调用此接口，PARSED 状态不变。没有增加正式向量列、发布 READY 分块、实现 SeekDB 真实向量检索或接入 DeepSeek。下一阶段在配置就绪后检查真实向量，并由用户共同查看 A/B 案例结果。
 
+同日后续验证：用户配置完成，两次固定短文本真实调用通过，均返回 1024 维向量，报告总用量 50 Token。详见 [连通检查结果](../verification/embedding-connectivity.json)。这项结果只确认接口与向量结构，A/B 检索实验仍待执行。
+
 ## 官方依据
 
 - [百炼向量化指南](https://help.aliyun.com/zh/model-studio/embedding)：模型、维度及 query/document 角色说明。

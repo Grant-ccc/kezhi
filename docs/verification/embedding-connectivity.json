@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-25",
+  "status": "embedding_connectivity_passed",
+  "profile": "bailian:cn-beijing:qwen3.7-text-embedding:1024:dense:query-document-v1:raw",
+  "command": "python -m app.models.check_embedding --live",
+  "input_provenance": "Two fixed self-authored synthetic texts from check_embedding.py; no uploaded documents.",
+  "calls": [
+    {
+      "kind": "document",
+      "requested_model": "qwen3.7-text-embedding",
+      "vector_count": 1,
+      "dimensions": 1024,
+      "total_tokens": 28,
+      "request_id": "db06621f-13e2-9bcd-a965-8d1dbc9f2215",
+      "elapsed_ms": 1220
+    },
+    {
+      "kind": "query",
+      "requested_model": "qwen3.7-text-embedding",
+      "vector_count": 1,
+      "dimensions": 1024,
+      "total_tokens": 22,
+      "request_id": "9fb15cf6-bb13-9c8b-a194-d2e5d08f4767",
+      "elapsed_ms": 838
+    }
+  ],
+  "reported_total_tokens": 50,
+  "actual_billed_amount": null,
+  "scope": "Real provider connectivity and vector structure only. No SeekDB retrieval, permission isolation or answer quality measured. Vectors were not persisted or published as searchable."
+}
