@@ -9,7 +9,7 @@
         "date": "2026-11-25",
         "method": "User selected A and B in a four-document product-design exercise.",
         "selected_relevant_ids": ["A", "B"],
-        "scope": "Retrieval relevance only; answer fallback policy remains undecided."
+        "scope": "User chose A+B as relevant sources, additional retrieval when only A is found, and a source-bounded answer using A if no additional evidence is found."
       },
       "actor": {
         "user_key": "student_a",
@@ -55,6 +55,27 @@
         "irrelevant_document_ids": ["C"],
         "require_filter_before_retrieval": true,
         "require_exact_order": false
+      },
+      "followup_policy": {
+        "scope": "This example only; not a global document-count threshold.",
+        "first_pass_document_ids": ["A"],
+        "user_selected_action": "perform_additional_retrieval_before_answering",
+        "review_date": "2026-11-25",
+        "review_method": "User selected additional retrieval (option 2), then answering with available evidence if only A remains (option 1).",
+        "evidence_gap": "A concrete transfer example connecting debit, credit, mid-operation failure and rollback.",
+        "fallback_when_no_new_evidence": {
+          "action": "answer_using_available_authorized_evidence",
+          "evidence_ids_in_this_example": ["A"],
+          "must_not_claim_access_to": ["B", "D"],
+          "human_authored_example_answer": "转账的扣款和入账应作为同一事务执行。事务内的操作要么全部成功，要么全部回滚；因此程序中途出错时，应一起回滚，避免只完成扣款。[A]",
+          "example_answer_provenance": "Human-authored illustration, not a generated model result or exact-match grading target."
+        },
+        "proposed_initial_budget": {
+          "max_additional_rounds": 1,
+          "basis": "Assistant-proposed experiment default; user explicitly selected the fallback behavior, not a numerical budget.",
+          "validation_status": "not_measured"
+        },
+        "undecided": ["additional_query_strategy", "evidence_sufficiency_detection", "behavior_when_no_authorized_evidence_exists"]
       }
     }
   ]
