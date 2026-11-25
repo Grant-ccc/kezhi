@@ -18,7 +18,7 @@ dist/
 
 # User files and model caches
 storage/
-models/
+/models/
 .cache/
 
 # Runtime output

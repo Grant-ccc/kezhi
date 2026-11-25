@@ -1,7 +1,8 @@
 from pathlib import Path
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,6 +27,19 @@ class Settings(BaseSettings):
     worker_retry_base_seconds: int = Field(default=5, ge=1, le=300)
     worker_poll_seconds: float = Field(default=2, ge=0.1, le=60)
     worker_task_timeout_seconds: int = Field(default=120, ge=1, le=3600)
+    dashscope_api_key: SecretStr | None = Field(default=None, repr=False)
+    dashscope_workspace_id: str = ""
+    dashscope_region: Literal["cn-beijing", "ap-southeast-1"] = "cn-beijing"
+    embedding_model: Literal["qwen3.7-text-embedding"] = "qwen3.7-text-embedding"
+    embedding_dimensions: int = 1024
+    embedding_timeout_seconds: float = Field(default=20, ge=1, le=60)
+
+    @field_validator("embedding_dimensions")
+    @classmethod
+    def supported_embedding_dimensions(cls, value: int) -> int:
+        if value not in {256, 512, 768, 1024, 1536, 2048, 2560}:
+            raise ValueError("Unsupported embedding dimensions")
+        return value
 
 
 @lru_cache

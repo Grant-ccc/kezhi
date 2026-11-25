@@ -47,8 +47,8 @@ flowchart TD
 | 文件 | 受控本地文件目录；元信息及所有权存数据库 |
 | 文件依赖 | python-multipart 处理表单，pypdf 校验文本型 PDF；TXT 和 Markdown 使用 UTF-8 校验 |
 | 登录 | 建议短时 JWT 放入 HttpOnly Cookie；状态与业务资格每次在后端检查，写请求校验 CSRF/来源，生产 HTTPS |
-| Embedding | 优先尝试本地中文模型；BGE-small-zh-v1.5 是候选，尚未锁定 |
-| 回答模型 | 云端付费 API，供应商与模型在真实问题评测后选择；Qwen 是候选而非决定 |
+| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维，适配层已实现，真实调用与检索待验证 |
+| 回答模型 | 用户已同意使用 DeepSeek，具体模型待验证；回答适配器尚未实现 |
 | RAG 编排 | 用清晰的 Python 流程函数实现，首版不引入额外编排框架 |
 | 测试 | pytest + 真实 SeekDB 集成测试 + 浏览器关键流程验证 |
 
@@ -86,7 +86,9 @@ worker 使用持久化任务和过期租约恢复；不能只靠 FastAPI 进程�
 
 ## 模型调用边界
 
-定义两种独立接口：`EmbeddingProvider.embed(texts)` 和 `AnswerProvider.generate(question, evidence, config)`。供应商 SDK 和异常转换封装在适配层，业务服务不散落具体模型调用代码。
+定义两种独立接口：`EmbeddingProvider.embed(texts, kind=...)` 和 `AnswerProvider.generate(question, evidence, config)`。供应商调用和异常转换封装在适配层，业务服务不散落具体模型调用代码。
+
+目前实现百炼原生 HTTP 向量适配层，使用 query/document 角色区分、维度及有限数值校验、按返回索引还原顺序、固定错误消息和无自动重试的调用边界。初始 1024 维与每批最多 8 段是工程默认值，尚未证明效果最优；没有接入现有资料 worker。模型选择过程见 [模型服务决策](decisions/002-model-providers.md)，配置和独立检查命令见 [接入指南](embedding-setup.md)。
 
 回答模型可配置供应商、模型/快照、地址、超时、输出上限和重试策略。保留模型版本及提示词版本用于评测复现。更换 Embedding 模型时需重建相应文档和查询向量，禁止不同向量空间混用。
 
@@ -94,7 +96,7 @@ worker 使用持久化任务和过期租约恢复；不能只靠 FastAPI 进程�
 
 每次模型调用和重试都记录在 qa_messages.model_calls 中，包含结果、耗时、请求编号、模型快照、区域、单价及价格版本、实际 Token 与估算费用；供应商没有返回的用量标记未知。汇总用量标注是否完整，不能将估算或不完整费用当作最终账单。实际 Top-K、排名、分数和上下文选入情况由 answer_evidence 保存，支持复核检索命中指标。
 
-小额预算先由调用次数、输入/输出上限、有限重试和用户限流约束，再结合供应商可用的预算控制。预算数额待用户决定，本轮不开户、不充值、不配置密钥。
+小额预算先由调用次数、输入/输出上限、有限重试和用户限流约束，再结合供应商可用的预算控制。已提供用户本地配置密钥的指南，不代替用户开户或充值；批量入库和问答预算数额仍待共同决定。独立连通检查最多两次固定短文本请求，未实现系统累计费用硬限额。
 
 ## 接口约定
 
