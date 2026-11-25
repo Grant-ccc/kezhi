@@ -1,0 +1,61 @@
+{
+  "version": "0.1",
+  "purpose": "Synthetic retrieval acceptance examples for product co-design; no model results yet.",
+  "cases": [
+    {
+      "case_id": "transfer_atomicity_001",
+      "provenance": "synthetic",
+      "review": {
+        "date": "2026-11-25",
+        "method": "User selected A and B in a four-document product-design exercise.",
+        "selected_relevant_ids": ["A", "B"],
+        "scope": "Retrieval relevance only; answer fallback policy remains undecided."
+      },
+      "actor": {
+        "user_key": "student_a",
+        "role": "STUDENT",
+        "enrolled_course_keys": ["database_demo"]
+      },
+      "question": "为什么转账不能只扣钱，不加钱？程序中途出错怎么办？",
+      "documents": [
+        {
+          "id": "A",
+          "course_key": "database_demo",
+          "kind": "TEACHING",
+          "owner_key": "teacher_demo",
+          "text": "事务具有原子性：事务内的操作要么全部成功，要么全部回滚，不能只完成一部分。"
+        },
+        {
+          "id": "B",
+          "course_key": "database_demo",
+          "kind": "NOTE",
+          "owner_key": "student_a",
+          "text": "转账需要扣减甲的余额、增加乙的余额。这两步应放在同一事务中，中途失败时一起回滚，避免余额不一致。"
+        },
+        {
+          "id": "C",
+          "course_key": "database_demo",
+          "kind": "TEACHING",
+          "owner_key": "teacher_demo",
+          "text": "数据库索引可以加快某些查询，但会增加存储和更新成本。"
+        },
+        {
+          "id": "D",
+          "course_key": "database_demo",
+          "kind": "NOTE",
+          "owner_key": "student_b",
+          "text": "转账失败时需要利用事务原子性，把扣款和入账操作一起回滚，避免只扣钱不加钱。这是其他同学的私人笔记。"
+        }
+      ],
+      "expected": {
+        "top_k": 2,
+        "authorized_document_ids": ["A", "B", "C"],
+        "relevant_document_ids": ["A", "B"],
+        "forbidden_document_ids": ["D"],
+        "irrelevant_document_ids": ["C"],
+        "require_filter_before_retrieval": true,
+        "require_exact_order": false
+      }
+    }
+  ]
+}
