@@ -1,0 +1,74 @@
+{
+  "course_id": 1000399,
+  "source": "real_bailian_api",
+  "fixture": "Self-authored A/B notes retained for local UI demonstration",
+  "documents": [
+    {
+      "label": "A",
+      "document_id": 279,
+      "calls": [
+        {
+          "requested_model": "qwen3.7-text-embedding",
+          "request_id": "9e9656bc-06af-950c-a6a2-92f5505c4d24",
+          "total_tokens": 38,
+          "elapsed_ms": 1635,
+          "outcome": "SUCCEEDED"
+        }
+      ]
+    },
+    {
+      "label": "B",
+      "document_id": 282,
+      "calls": [
+        {
+          "requested_model": "qwen3.7-text-embedding",
+          "request_id": "57c5af87-1b46-9f73-a757-691e85fd4412",
+          "total_tokens": 48,
+          "elapsed_ms": 1905,
+          "outcome": "SUCCEEDED"
+        }
+      ]
+    }
+  ],
+  "search_requests": [
+    {
+      "id": 21,
+      "status": "SUCCEEDED",
+      "model_call": {
+        "outcome": "SUCCEEDED",
+        "profile": "bailian:cn-beijing:qwen3.7-text-embedding:1024:dense:query-document-v1:raw",
+        "elapsed_ms": 1353,
+        "request_id": "164fa18c-fbd9-936e-a6c9-924bbceef442",
+        "total_tokens": 31,
+        "requested_model": "qwen3.7-text-embedding"
+      },
+      "evidence": [
+        {
+          "chunk_id": 219,
+          "distance": 0.2990758597299956,
+          "content_version": 1
+        },
+        {
+          "chunk_id": 215,
+          "distance": 0.5478844401698637,
+          "content_version": 1
+        }
+      ]
+    }
+  ],
+  "browser_checks": {
+    "real_search_returned_B_A": true,
+    "selected_A_original_displayed": true,
+    "view_results_reused_request": true,
+    "desktop_width": 1280,
+    "mobile_requested_width": 390,
+    "mobile_content_width": 375,
+    "mobile_viewport_client_width": 375
+  },
+  "reported_total_tokens": 117,
+  "actual_billed_amount": null,
+  "screenshots_ignored_local_files": [
+    "storage/qa/retrieval-page-desktop.jpg",
+    "storage/qa/retrieval-page-mobile.jpg"
+  ]
+}

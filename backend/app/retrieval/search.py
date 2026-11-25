@@ -41,7 +41,8 @@ def search(cursor, *, actor_id: int, course_id: int, profile: str,
     if not math.isfinite(norm) or norm == 0:
         raise ValueError("Invalid query vector")
     vector = json.dumps(list(query_vector), allow_nan=False, separators=(",", ":"))
-    cursor.execute("""SELECT ch.id AS chunk_id,d.id AS document_id,d.title,ch.content,
+    cursor.execute("""SELECT ch.id AS chunk_id,d.id AS document_id,d.title,d.kind,ch.content,
+                    ch.content_version,ch.page_number,ch.section_title,ch.chunk_index,
                     cosine_distance(ch.embedding,%s) AS distance""" + AUTHORIZED_FROM +
                    " ORDER BY distance,ch.id LIMIT %s",
                    (vector, actor_id, course_id, profile, top_k))

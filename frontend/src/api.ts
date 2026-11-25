@@ -16,6 +16,12 @@ export type Material = {
 }
 export type ChunkList = {items:{chunk_index:number;content:string;page_number:number|null;section_title:string|null;char_start:number;char_end:number}[];total:number;page:number;page_size:number;content_version:number;searchable:boolean;chunking_profile:string}
 export type MaterialList = { items: Material[]; total:number; page:number; page_size:number }
+export type SearchResult = {
+  id:number; course_id:number; question:string; status:'PROCESSING'|'SUCCEEDED'|'FAILED';
+  error_code:string|null; notice:string; query_tokens:number|null; usage_known:boolean;
+  items:{chunk_id:number; document_id:number; title:string; kind:'NOTE'|'TEACHING'; content:string;
+    content_version:number; page_number:number|null; section_title:string|null; chunk_index:number; rank:number; distance:number}[];
+}
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message) }

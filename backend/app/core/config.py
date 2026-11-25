@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1024
     embedding_timeout_seconds: float = Field(default=20, ge=1, le=60)
     embedding_max_chunks_per_document: int = Field(default=32, ge=1, le=512)
+    retrieval_requests_per_minute: int = Field(default=6, ge=1, le=60)
+    retrieval_deadline_seconds: int = Field(default=60, ge=5, le=180)
 
     @field_validator("embedding_dimensions")
     @classmethod

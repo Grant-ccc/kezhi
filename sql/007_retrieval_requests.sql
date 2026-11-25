@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS retrieval_requests (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ user_id BIGINT NOT NULL,
+ course_id BIGINT NOT NULL,
+ request_key VARCHAR(64) NOT NULL,
+ payload_hash CHAR(64) NOT NULL,
+ question TEXT NOT NULL,
+ embedding_profile VARCHAR(255) NOT NULL,
+ status VARCHAR(16) NOT NULL DEFAULT 'PROCESSING',
+ evidence JSON NULL,
+ model_call JSON NULL,
+ error_code VARCHAR(64) NULL,
+ deadline_at DATETIME(6) NOT NULL,
+ created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ completed_at DATETIME(6) NULL,
+ UNIQUE KEY uq_retrieval_request(user_id,request_key),
+ KEY idx_retrieval_rate(user_id,created_at),
+ KEY idx_retrieval_course(course_id),
+ CONSTRAINT fk_retrieval_user FOREIGN KEY(user_id) REFERENCES users(id),
+ CONSTRAINT fk_retrieval_course FOREIGN KEY(course_id) REFERENCES courses(id),
+ CONSTRAINT chk_retrieval_status CHECK(status IN ('PROCESSING','SUCCEEDED','FAILED'))
+) DEFAULT CHARSET=utf8mb4;

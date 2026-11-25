@@ -1,6 +1,6 @@
 # 课程学习助手数据库设计初稿
 
-版本：0.4。使用一个 SeekDB 数据库管理关系数据和向量。11 张业务表、任务阶段/审计迁移和正式 1024 维 embedding 列已在 SeekDB 1.4.0 验证。资料解析与单份向量发布 worker 已实现；使用精确向量排序，尚未增加 ANN 向量索引，问答仍是目标设计。
+版本：0.5。使用一个 SeekDB 数据库管理关系数据和向量。现有 12 张表，包含新增的 retrieval_requests；任务阶段/审计与 1024 维向量列已迁移。资料解析、向量发布和登录后的资料检索已实现；使用精确排序，未增加 ANN 索引，生成问答仍是目标设计。
 
 ## ER 图
 
@@ -14,6 +14,8 @@ erDiagram
     COURSES ||--o{ DOCUMENTS : contains
     DOCUMENTS ||--o{ DOCUMENT_CHUNKS : splits
     DOCUMENTS ||--o{ INDEX_JOBS : processes
+    USERS ||--o{ RETRIEVAL_REQUESTS : submits
+    COURSES ||--o{ RETRIEVAL_REQUESTS : scopes
     USERS ||--o{ QA_SESSIONS : owns
     COURSES ||--o{ QA_SESSIONS : scopes
     QA_SESSIONS ||--o{ QA_MESSAGES : contains
@@ -110,6 +112,17 @@ TEACHING 的所有者须为该课任课教师；NOTE 的所有者须为该课有
 每个正文版本一条任务，重试更新同一条记录。领取任务需原子状态更新及租约；成功发布、失败写回和续租都必须校验当前版本、RUNNING 状态、未过期租约和 worker_token。失败写回还需确认资料仍为该版本的 PROCESSING，不能覆盖其他 worker 已发布的 READY 或 DELETED。
 
 手动重试只允许当前未删除版本，从任务 FAILED 原子转为 PENDING，并将资料 FAILED 转为 PROCESSING；每轮最多尝试次数由配置限定。retry_round 每次手动重试递增，attempt_count 表示当前阶段当前轮的尝试次数并归零；首次从 PARSED 领取向量阶段时重新计数，旧 worker_token 作废。向量失败保留分块与已有调用审计，重试仍走 EMBEDDING，不重复解析。客户端提交 expected_retry_round，旧轮次请求返回 409；重复请求不能再次递增轮次。
+
+### retrieval_requests 独立资料检索
+
+- user_id、course_id 外键指定用户及课程；request_key 与 user_id 唯一，payload_hash 比较课程与问题，防止同键不同请求。
+- question 保存用户问题；embedding_profile 记录本次向量空间。
+- status：PROCESSING / SUCCEEDED / FAILED；deadline_at、created_at、completed_at 用于超时和限流。
+- model_call：JSON 调用审计，调用前为 IN_FLIGHT，完成后保存实际 Token、编号、耗时与模型；无密钥，未知用量不补零。
+- evidence：仅保存 chunk_id、content_version 和 distance，不存一份私人原文快照。读取时使用当前课程、所有权、版本、资料状态和 profile 条件重新提取正文，任一依赖失效则拒绝整次结果。
+- error_code：固定错误码，无上游原始报错。读取未完成请求时按截止时间判失败，不自动再次产生费用。
+
+新请求在课程、用户的锁下做资格校验、幂等检查和每分钟计数，唯一约束保护并发重复提交。模型请求在事务外；完成后先保存用量，再锁课程和请求，重新检查资格和截止时间后保存结果。检索记录与生成问答表分开，避免把片段检索当作已生成答案。
 
 ### qa_sessions 问答会话
 

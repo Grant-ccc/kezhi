@@ -36,7 +36,7 @@ def main():
             for statement in statements(ROOT / "sql/002_seed.sql"):
                 cursor.execute(statement.replace("{{DEMO_PASSWORD_HASH}}", password_hash))
         connection.commit()
-        print("Applied 11 business tables, vector column and job metadata; preserved/inserted demo records.")
+        print("Applied 12 tables, vector column and job metadata; preserved/inserted demo records.")
     except Exception:
         connection.rollback()
         raise

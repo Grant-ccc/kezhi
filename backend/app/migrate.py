@@ -38,6 +38,9 @@ def apply_migrations(connection):
         cursor.execute("UPDATE index_jobs SET stage='EMBEDDING' WHERE status='PARSED' AND stage='PARSE'")
     connection.commit()
     print("Embedding job metadata applied or already current.")
+    with connection.cursor() as cursor:
+        cursor.execute((ROOT / 'sql/007_retrieval_requests.sql').read_text(encoding='utf-8').strip().rstrip(';'))
+    print('Retrieval request table verified.')
 
 
 def vector_dimension(cursor):

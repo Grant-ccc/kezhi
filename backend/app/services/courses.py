@@ -128,7 +128,7 @@ def delete_course(user: dict, course_id: int):
         lock_course(cursor, course_id)
         require_manager(cursor, user["id"], course_id)
         # Retain all historical relationships; only completely unused courses can be removed.
-        for table in ("enrollments", "documents", "qa_sessions"):
+        for table in ("enrollments", "documents", "qa_sessions", "retrieval_requests"):
             cursor.execute(f"SELECT id FROM {table} WHERE course_id=%s LIMIT 1", (course_id,))
             if cursor.fetchone():
                 raise BusinessError(409, "COURSE_HAS_RECORDS", "课程已有业务记录，请关闭选课以保留历史")

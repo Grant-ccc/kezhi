@@ -33,6 +33,7 @@ def course(monkeypatch, tmp_path):
     connection = connect(root=True)
     try:
         with connection.cursor() as cursor:
+            cursor.execute('DELETE FROM retrieval_requests WHERE course_id=%s', (identifier,))
             cursor.execute("DELETE ch FROM document_chunks ch JOIN documents d ON d.id=ch.document_id WHERE d.course_id=%s", (identifier,))
             cursor.execute("DELETE j FROM index_jobs j JOIN documents d ON d.id=j.document_id WHERE d.course_id=%s", (identifier,))
             for table in ("documents", "enrollments", "course_teachers", "courses"):
