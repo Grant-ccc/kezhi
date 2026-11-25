@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     embedding_model: Literal["qwen3.7-text-embedding"] = "qwen3.7-text-embedding"
     embedding_dimensions: int = 1024
     embedding_timeout_seconds: float = Field(default=20, ge=1, le=60)
+    embedding_max_chunks_per_document: int = Field(default=32, ge=1, le=512)
 
     @field_validator("embedding_dimensions")
     @classmethod

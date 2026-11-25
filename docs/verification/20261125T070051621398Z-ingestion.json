@@ -1,0 +1,39 @@
+{
+  "checked_at": "2026-11-25T07:00:46.983123+00:00",
+  "source": "real_bailian_api",
+  "scope": "Service-level upload, parsing, publication and SQL search; no HTTP login, answer generation or quality benchmark.",
+  "input_provenance": "Fixed self-authored transaction note and question; no existing uploads.",
+  "calls": [
+    {
+      "outcome": "SUCCEEDED",
+      "requested_model": "qwen3.7-text-embedding",
+      "total_tokens": 61,
+      "request_id": "f8f8b399-6d9c-9ba6-970c-6f68c1cfbb7a",
+      "elapsed_ms": 1404,
+      "profile": "bailian:cn-beijing:qwen3.7-text-embedding:1024:dense:query-document-v1:raw"
+    },
+    {
+      "outcome": "SUCCEEDED",
+      "requested_model": "qwen3.7-text-embedding",
+      "total_tokens": 31,
+      "request_id": "c76715e3-2518-9f7f-a2af-31901c1d6858",
+      "elapsed_ms": 1337,
+      "profile": "bailian:cn-beijing:qwen3.7-text-embedding:1024:dense:query-document-v1:raw"
+    }
+  ],
+  "actual_billed_amount": null,
+  "fixture_cleaned": true,
+  "passed": true,
+  "parse_status": "parsed",
+  "embedding_status": "ready",
+  "checks": {
+    "ready": true,
+    "searchable_preview": true,
+    "own_note_found": true,
+    "other_student_excluded": true
+  },
+  "retrieval_distances": [
+    0.3055173936794524
+  ],
+  "reported_total_tokens": 92
+}

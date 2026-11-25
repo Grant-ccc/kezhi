@@ -27,15 +27,16 @@ def main():
         with connection.cursor() as cursor:
             for statement in statements(ROOT / "sql/001_schema.sql"):
                 cursor.execute(statement)
-        from app.migrate import apply_migrations
+        from app.migrate import apply_migrations, apply_vectors
         apply_migrations(connection)
+        apply_vectors(connection, settings.embedding_dimensions)
         connection.begin()
         with connection.cursor() as cursor:
             password_hash = connection.escape(hasher.hash(settings.demo_password))
             for statement in statements(ROOT / "sql/002_seed.sql"):
                 cursor.execute(statement.replace("{{DEMO_PASSWORD_HASH}}", password_hash))
         connection.commit()
-        print("Applied 11 business tables and preserved/inserted demo records. Vector migration remains deferred.")
+        print("Applied 11 business tables, vector column and job metadata; preserved/inserted demo records.")
     except Exception:
         connection.rollback()
         raise

@@ -1,6 +1,6 @@
 # 课程学习助手技术架构初稿
 
-前端使用 React，后端使用 Python FastAPI。首版按模块组织一个后端应用，另启用同代码仓库的资料处理 worker；SeekDB 承担关系数据和向量数据。大模型供应商和具体模型保持待定，不阻塞业务开发。
+前端使用 React，后端使用 Python FastAPI。首版按模块组织一个后端应用，另启用同代码仓库的资料处理 worker；SeekDB 承担关系数据和向量数据。首版已选择百炼向量化和 DeepSeek 回答，具体回答模型及整体效果仍待验证。
 
 ## 系统分层
 
@@ -34,7 +34,7 @@ flowchart TD
 | `evals` | 评测集、评分规则、运行配置与结果 |
 | `docs` | 产品、架构、数据库和验收材料 |
 
-以上是完整目标目录。当前已实现 API、core、课程与资料 services、文件校验与分块模块 documents、解析 worker 和 React 界面；repositories 尚未单独拆分，SQL 暂位于服务层及队列模块。向量化与 RAG 尚未实现。
+以上是完整目标目录。当前已实现 API、core、课程与资料 services、文件校验与分块、解析/单份向量化 worker、授权检索 SQL、模型适配及评测模块；repositories 尚未单独拆分。React 资料页支持状态展示，检索 HTTP 和 RAG 问答尚未实现。
 
 ## 技术选择与待定项
 
@@ -47,7 +47,7 @@ flowchart TD
 | 文件 | 受控本地文件目录；元信息及所有权存数据库 |
 | 文件依赖 | python-multipart 处理表单，pypdf 校验文本型 PDF；TXT 和 Markdown 使用 UTF-8 校验 |
 | 登录 | 建议短时 JWT 放入 HttpOnly Cookie；状态与业务资格每次在后端检查，写请求校验 CSRF/来源，生产 HTTPS |
-| Embedding | 首版百炼云 API：qwen3.7-text-embedding，初始 1024 维；独立临时库的单题真实 SeekDB 检索通过，正式向量发布尚未实现 |
+| Embedding | 百炼 qwen3.7-text-embedding，初始 1024 维；单份资料向量发布及自编笔记真实服务链路通过 |
 | 回答模型 | 用户已同意使用 DeepSeek，具体模型待验证；回答适配器尚未实现 |
 | RAG 编排 | 用清晰的 Python 流程函数实现，首版不引入额外编排框架 |
 | 测试 | pytest + 真实 SeekDB 集成测试 + 浏览器关键流程验证 |
@@ -68,7 +68,7 @@ PyMySQL 是数据库驱动，不是另部署一个 MySQL。课程实验 0 可使
 
 worker 使用持久化任务和过期租约恢复；不能只靠 FastAPI 进程内后台任务保证重启后继续执行。外部模型请求和长时间文件处理不能持有数据库行锁。
 
-当前实际运行流程止于 PARSED：解析结果原子保存但不发布为可检索。所有队列写入统一按课程、资料、任务顺序加锁，并检查当前版本、租约和令牌。分块预处理采用字符上限，真实 Embedding 接入前还要按 tokenizer 检查，详见 [解析阶段记录](verification/milestone-03.md)。
+当前分成 PARSE 和 EMBEDDING 两阶段。解析先原子保存不可检索的 PARSED 分块；显式指定资料运行向量化命令后，全部向量在一个事务发布，切换 READY/SUCCEEDED。队列写入统一按课程、资料、任务顺序加锁，检查阶段、当前版本、有效租约和令牌；发布还比对分块快照及上传者课程资格。具体实现和边界见 [发布阶段记录](verification/milestone-06.md)。当前每段最多 600 字符，每批最多 8 段，每份初始最多 32 段，这是工程调用范围保护，尚未集成模型 tokenizer。
 
 ## 问答与检索授权
 
@@ -84,13 +84,15 @@ worker 使用持久化任务和过期租约恢复；不能只靠 FastAPI 进程�
 
 首版小数据集优先验证带授权条件的精确向量查询。确有性能需求后再评测 ANN 或混合检索，不能为性能省略候选权限限制。
 
-当前已在独立临时库验证这条路径的 SQL：app/retrieval/search.py 由候选检查和排序共用授权条件，角色和资格从库内用户、选课及授课记录判断。app/evaluation/retrieval.py 运行 A/B 自编用例，真实返回 B/A，13 个状态变体通过，见 [实验记录](verification/milestone-05.md)。尚未暴露检索 HTTP 接口或修改正式库向量结构；正式接口仍需使用可信登录身份并完成发送前、保存前及历史读取时的再次校验。
+app/retrieval/search.py 由候选检查和排序共用授权条件，角色和资格从库内关系判断。独立临时库 A/B 自编用例真实返回 B/A，13 个状态变体通过，见 [实验记录](verification/milestone-05.md)。正式库已迁移向量列，自编笔记通过上传、解析、发布和授权 SQL 检索的服务级验证。尚未暴露检索 HTTP 接口；正式问答仍需使用可信登录身份并完成发送前、保存前及历史读取时的再次校验。
 
 ## 模型调用边界
 
 定义两种独立接口：`EmbeddingProvider.embed(texts, kind=...)` 和 `AnswerProvider.generate(question, evidence, config)`。供应商调用和异常转换封装在适配层，业务服务不散落具体模型调用代码。
 
-目前实现百炼原生 HTTP 向量适配层，使用 query/document 角色区分、维度及有限数值校验、按返回索引还原顺序、固定错误消息和无自动重试的调用边界。初始 1024 维与每批最多 8 段是工程默认值，尚未证明效果最优；没有接入现有资料 worker。模型选择过程见 [模型服务决策](decisions/002-model-providers.md)，配置和独立检查命令见 [接入指南](embedding-setup.md)。
+百炼原生 HTTP 适配层区分 query/document，校验向量并还原返回顺序，使用固定错误消息且不自动重试。向量 worker 已接入现有 index_jobs，处理已解析片段并发布；原解析命令仍不调用云端 API。初始维度及批量参数是工程默认值，尚未证明效果最优。模型选择过程见 [模型服务决策](decisions/002-model-providers.md)，配置见 [接入指南](embedding-setup.md)。
+
+每次向量请求前在 index_jobs.model_calls 持久化 IN_FLIGHT 审计，返回后补充用量、编号与耗时；中断时未完成记录保持未知，不能当成免费或已成功。迟到结果可补自己的审计记录，但不能发布资料或覆盖新任务状态。已处理的模型失败直接 FAILED，用户手动排队后由维护者再显式运行；没有自动付费重试或历史队列扫描。
 
 回答模型可配置供应商、模型/快照、地址、超时、输出上限和重试策略。保留模型版本及提示词版本用于评测复现。更换 Embedding 模型时需重建相应文档和查询向量，禁止不同向量空间混用。
 

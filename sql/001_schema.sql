@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS index_jobs (
  request_key VARCHAR(64) NOT NULL,
  payload_hash CHAR(64) NOT NULL,
  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+ stage VARCHAR(16) NOT NULL DEFAULT 'PARSE',
+ model_calls JSON NULL,
  retry_round INT NOT NULL DEFAULT 0,
  attempt_count INT NOT NULL DEFAULT 0,
  next_run_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -129,6 +131,7 @@ CREATE TABLE IF NOT EXISTS index_jobs (
  CONSTRAINT fk_job_document FOREIGN KEY(document_id) REFERENCES documents(id),
  CONSTRAINT fk_job_requester FOREIGN KEY(requested_by) REFERENCES users(id),
  CONSTRAINT chk_job_status_v2 CHECK(status IN ('PENDING','RUNNING','PARSED','SUCCEEDED','FAILED','CANCELLED')),
+ CONSTRAINT chk_job_stage CHECK(stage IN ('PARSE','EMBEDDING')),
  CONSTRAINT chk_job_attempts CHECK(attempt_count>=0 AND retry_round>=0)
 ) DEFAULT CHARSET=utf8mb4;
 

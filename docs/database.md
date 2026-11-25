@@ -1,6 +1,6 @@
 # 课程学习助手数据库设计初稿
 
-版本：0.3。使用一个 SeekDB 数据库管理关系数据和向量。11 张业务表及解析状态迁移已在 SeekDB 1.4.0 验证；正式 embedding 列及向量索引待模型确定后迁移。资料管理与解析 worker 已实现，问答仍是目标设计。
+版本：0.4。使用一个 SeekDB 数据库管理关系数据和向量。11 张业务表、任务阶段/审计迁移和正式 1024 维 embedding 列已在 SeekDB 1.4.0 验证。资料解析与单份向量发布 worker 已实现；使用精确向量排序，尚未增加 ANN 向量索引，问答仍是目标设计。
 
 ## ER 图
 
@@ -88,7 +88,7 @@ TEACHING 的所有者须为该课任课教师；NOTE 的所有者须为该课有
 - `id`：主键；`document_id` → documents。
 - `content_version`、`chunk_index`、`content`。
 - `page_number`（可空）、`section_title`（可空）、`char_start`、`char_end`（可空）。
-- `embedding`：SeekDB 向量列，维度由最终选定的 Embedding 模型决定。
+- `embedding`：SeekDB VECTOR 列，当前为 1024 维；初始化/迁移按模型配置添加，已有列维度不匹配时拒绝变更。
 - `embedding_profile`：模型、版本、维度及归一化方式对应的配置标识。
 - `is_current`：是否属于当前可发布版本；`created_at`。
 - 唯一约束：`(document_id, content_version, chunk_index)`。
@@ -101,13 +101,15 @@ TEACHING 的所有者须为该课任课教师；NOTE 的所有者须为该课有
 
 - `id`：主键；`document_id` → documents；`content_version`。
 - `requested_by` → users；`request_key`、`payload_hash`：该版本创建或替换请求的幂等记录；唯一约束 `(requested_by, request_key)`。
-- `status`：PENDING / RUNNING / PARSED / SUCCEEDED / FAILED / CANCELLED；本阶段任务结束于 PARSED，完整向量索引成功后才使用 SUCCEEDED。
+- `status`：PENDING / RUNNING / PARSED / SUCCEEDED / FAILED / CANCELLED；解析阶段结束于 PARSED，完整向量发布后变为 SUCCEEDED。
+- `stage`：PARSE / EMBEDDING；每个正文版本仍只有一条任务，解析后切换阶段，两个 worker 不能互相领取。
+- `model_calls`：JSON 数组，向量批次请求前写入 IN_FLIGHT、调用 ID、租约 token、尝试/重试轮次、批次和 profile；返回后记录结果、请求 ID、耗时及服务商实际用量。无原文或密钥。迟到调用仅可补全自己的审计项，不能变更任务和资料业务状态。
 - `retry_round`、`attempt_count`、`next_run_at`、`lease_until`、`worker_token`、`error_code`、`created_at`、`updated_at`。
 - 唯一约束：`(document_id, content_version)`。
 
 每个正文版本一条任务，重试更新同一条记录。领取任务需原子状态更新及租约；成功发布、失败写回和续租都必须校验当前版本、RUNNING 状态、未过期租约和 worker_token。失败写回还需确认资料仍为该版本的 PROCESSING，不能覆盖其他 worker 已发布的 READY 或 DELETED。
 
-手动重试只允许当前未删除版本，从任务 FAILED 原子转为 PENDING，并将资料 FAILED 转为 PROCESSING；每轮最多尝试次数由配置限定。retry_round 每次手动重试递增，attempt_count 表示当前轮尝试次数并归零；旧 worker_token 作废。客户端提交 expected_retry_round，条件更新同时检查该值，旧轮次请求返回 409 并附当前状态；重复请求不能再次递增轮次或重启失败后的新一轮。
+手动重试只允许当前未删除版本，从任务 FAILED 原子转为 PENDING，并将资料 FAILED 转为 PROCESSING；每轮最多尝试次数由配置限定。retry_round 每次手动重试递增，attempt_count 表示当前阶段当前轮的尝试次数并归零；首次从 PARSED 领取向量阶段时重新计数，旧 worker_token 作废。向量失败保留分块与已有调用审计，重试仍走 EMBEDDING，不重复解析。客户端提交 expected_retry_round，旧轮次请求返回 409；重复请求不能再次递增轮次。
 
 ### qa_sessions 问答会话
 
@@ -185,7 +187,7 @@ TEACHING 的所有者须为该课任课教师；NOTE 的所有者须为该课有
 
 替换正文时先查 index_jobs 中本人请求键：同键同内容返回已有版本，同键不同内容返回 409。新请求锁定资料，递增版本，切换 storage_key，设为 PROCESSING，作废旧版本当前分块并创建任务。并发替换要带客户端看到的版本进行乐观检查，冲突时要求刷新。失败或唯一键竞争失败只清理本请求独占的新文件。
 
-解析与模型计算在事务外完成，发布时用短事务检查资料未删除、版本未变、任务租约仍属于当前 worker，再写入全部新分块、标记 READY 和任务 SUCCEEDED。部分分块不能提前参与检索。
+解析与模型计算在事务外完成。先原子保存不可检索的 PARSED 分块；向量阶段发布时用短事务检查资料未删除、版本与分块快照未变、上传者仍具课程处理资格、有效租约和 token，再更新全部向量与当前标记、资料 READY 和任务 SUCCEEDED。部分分块不能提前参与检索。
 
 ### 删除资料与保存回答
 

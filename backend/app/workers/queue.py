@@ -1,4 +1,4 @@
-"""Persistent parse jobs. All mutations lock course -> document -> job."""
+"""Persistent parse/embedding jobs. All mutations lock course -> document -> job."""
 from contextlib import contextmanager
 from uuid import uuid4
 
@@ -21,17 +21,21 @@ def locked_job(job):
 def owned(job, current, document):
     return bool(current and current["status"] == "RUNNING" and current["worker_token"] == job["worker_token"]
                 and current["lease_valid"] and document["status"] == "PROCESSING"
+                and current["stage"] == job["stage"] and document["deleted_at"] is None
                 and current["content_version"] == job["content_version"] == document["content_version"])
 
 
-def claim_job(*, document_id: int | None = None):
+def claim_job(*, document_id: int | None = None, stage: str = "PARSE"):
+    if stage not in {"PARSE", "EMBEDDING"}:
+        raise ValueError("Invalid processing stage")
     # Read candidate ids without locks; recheck every condition after ordered locks.
-    params = (document_id,) if document_id is not None else ()
+    params = (stage, stage, document_id) if document_id is not None else (stage, stage)
     with read_connection() as connection, connection.cursor() as cursor:
         cursor.execute("""SELECT j.id,j.document_id,d.course_id FROM index_jobs j
             JOIN documents d ON d.id=j.document_id AND d.content_version=j.content_version
-            WHERE d.status='PROCESSING' AND
+            WHERE j.stage=%s AND d.status IN ('PROCESSING','PARSED') AND
               ((j.status='PENDING' AND j.next_run_at<=UTC_TIMESTAMP(6)) OR
+               (j.status='PARSED' AND %s='EMBEDDING') OR
                (j.status='RUNNING' AND (j.lease_until IS NULL OR j.lease_until<=UTC_TIMESTAMP(6))))"""
                        + (" AND d.id=%s" if document_id is not None else "")
                        + " ORDER BY j.next_run_at,j.id LIMIT 16", params)
@@ -39,20 +43,22 @@ def claim_job(*, document_id: int | None = None):
     settings = get_settings()
     for candidate in candidates:
         with locked_job(candidate) as (cursor, current, document):
-            if not current or document["status"] != "PROCESSING" or current["content_version"] != document["content_version"]:
+            if not current or current['stage'] != stage or document["status"] not in {'PROCESSING','PARSED'} or current["content_version"] != document["content_version"]:
                 continue
             cursor.execute("SELECT next_run_at<=UTC_TIMESTAMP(6) AS due FROM index_jobs WHERE id=%s", (current["id"],))
             due = cursor.fetchone()["due"]
-            eligible = (current["status"] == "PENDING" and due) or (current["status"] == "RUNNING" and not current["lease_valid"])
+            eligible = (current["status"] == "PENDING" and due) or (current["status"] == "RUNNING" and not current["lease_valid"]) or (stage == 'EMBEDDING' and current['status'] == 'PARSED')
             if not eligible:
                 continue
-            if current["attempt_count"] >= settings.worker_max_attempts:
+            attempts = 0 if current['status'] == 'PARSED' else current['attempt_count']
+            if attempts >= settings.worker_max_attempts:
                 cursor.execute("UPDATE index_jobs SET status='FAILED',error_code='ATTEMPTS_EXHAUSTED',worker_token=NULL,lease_until=NULL WHERE id=%s", (current["id"],))
                 cursor.execute("UPDATE documents SET status='FAILED',error_code='ATTEMPTS_EXHAUSTED',error_detail=NULL WHERE id=%s", (document["id"],))
                 continue
             token = uuid4().hex
-            cursor.execute("UPDATE index_jobs SET status='RUNNING',attempt_count=attempt_count+1,worker_token=%s,lease_until=TIMESTAMPADD(SECOND,%s,UTC_TIMESTAMP(6)),error_code=NULL WHERE id=%s", (token, settings.worker_lease_seconds, current["id"]))
-            return {**current, "status": "RUNNING", "attempt_count": current["attempt_count"] + 1, "worker_token": token,
+            cursor.execute("UPDATE index_jobs SET status='RUNNING',attempt_count=%s,worker_token=%s,lease_until=TIMESTAMPADD(SECOND,%s,UTC_TIMESTAMP(6)),error_code=NULL WHERE id=%s", (attempts + 1, token, settings.worker_lease_seconds, current["id"]))
+            cursor.execute("UPDATE documents SET status='PROCESSING' WHERE id=%s", (document['id'],))
+            return {**current, "status": "RUNNING", "attempt_count": attempts + 1, "worker_token": token,
                     "course_id": document["course_id"], "storage_key": document["storage_key"],
                     "original_filename": document["original_filename"], "content_hash": document["content_hash"], "size_bytes": document["size_bytes"]}
     return None
@@ -77,7 +83,7 @@ def publish_chunks(job, chunks):
                            [(job["document_id"], job["content_version"], chunk.index, chunk.content, chunk.page_number, chunk.section_title, chunk.char_start, chunk.char_end) for chunk in chunks])
         # Neither document nor chunks are searchable until real vector publication.
         cursor.execute("UPDATE documents SET status='PARSED',error_code=NULL,error_detail=NULL WHERE id=%s", (job["document_id"],))
-        cursor.execute("UPDATE index_jobs SET status='PARSED',worker_token=NULL,lease_until=NULL,error_code=NULL WHERE id=%s", (job["id"],))
+        cursor.execute("UPDATE index_jobs SET status='PARSED',stage='EMBEDDING',worker_token=NULL,lease_until=NULL,error_code=NULL WHERE id=%s", (job["id"],))
         return True
 
 

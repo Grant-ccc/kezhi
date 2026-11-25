@@ -54,15 +54,18 @@ def present(document: dict, user: dict, cursor):
     result["can_manage"] = document["owner_id"] == user["id"] if document["kind"] == "NOTE" else user["role"] == "TEACHER"
     cursor.execute("SELECT id FROM enrollments WHERE course_id=%s AND student_id=%s AND status='ACTIVE'", (document["course_id"], user["id"]))
     result["can_replace"] = result["can_manage"] and (user["role"] == "TEACHER" or cursor.fetchone() is not None)
-    cursor.execute("SELECT status,attempt_count,retry_round,next_run_at,error_code FROM index_jobs WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
+    cursor.execute("SELECT status,stage,attempt_count,retry_round,next_run_at,error_code FROM index_jobs WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
     job = cursor.fetchone()
     result["index_status"] = job["status"] if job else None
+    result["index_stage"] = job["stage"] if job else None
     result["attempt_count"] = job["attempt_count"] if job else 0
     result["retry_round"] = job["retry_round"] if job else 0
     result["next_run_at"] = job["next_run_at"] if job else None
     result["can_retry"] = bool(result["can_replace"] and document["status"] == "FAILED" and job and job["status"] == "FAILED")
     error_code = job["error_code"] if job else None
-    result["processing_error"] = ({"FILE_MISSING": "原文件缺失，请重新上传或替换", "FILE_CHANGED": "文件完整性校验失败，请替换原文件", "ATTEMPTS_EXHAUSTED": "处理多次中断，请确认服务正常后重试", "PROCESSING_FAILED": "处理暂时失败，将按计划重试或等待手动重试", "PROCESSING_TIMEOUT": "处理超时，请拆分文件后重试"}.get(error_code, "文件解析失败，请检查文件后重试") if error_code else None)
+    errors = {"FILE_MISSING": "原文件缺失，请重新上传或替换", "FILE_CHANGED": "文件完整性校验失败，请替换原文件", "ATTEMPTS_EXHAUSTED": "处理多次中断，请确认服务正常后重试", "PROCESSING_FAILED": "处理暂时失败，将按计划重试或等待手动重试", "PROCESSING_TIMEOUT": "处理超时，请拆分文件后重试",
+              "EMBEDDING_ACCESS_DENIED": "向量服务权限不匹配，请联系维护者核对配置", "EMBEDDING_RATE_LIMITED": "向量服务限流，核对用量后可手动重试", "EMBEDDING_TIMEOUT": "向量服务超时，核对用量后可手动重试", "EMBEDDING_ACCESS_REVOKED": "上传者的课程资格已失效，恢复资格后可重试", "EMBEDDING_CHUNK_LIMIT": "片段数量超出本轮处理范围，请拆分资料或联系维护者", "EMBEDDING_INVALID_CHUNKS": "资料分块不符合向量处理要求，请替换文件"}
+    result["processing_error"] = (errors.get(error_code, "向量化失败，请核对配置和用量后重试" if job and job["stage"] == 'EMBEDDING' else "文件解析失败，请检查文件后重试") if error_code else None)
     cursor.execute("SELECT COUNT(*) AS n FROM document_chunks WHERE document_id=%s AND content_version=%s", (document["id"], document["content_version"]))
     result["chunk_count"] = cursor.fetchone()["n"]
     return result

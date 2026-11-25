@@ -11,7 +11,7 @@ export type Material = {
   id: number; course_id: number; owner_id: number; kind: 'TEACHING'|'NOTE'; title: string;
   original_filename: string; media_type: string; size_bytes: number; content_version: number;
   status: 'PROCESSING'|'PARSED'|'READY'|'FAILED'|'DELETED'; created_at: string; updated_at: string;
-  course_name: string; can_manage: boolean; can_replace: boolean; index_status: string|null;
+  course_name: string; can_manage: boolean; can_replace: boolean; index_status: string|null; index_stage:'PARSE'|'EMBEDDING'|null;
   can_retry:boolean; attempt_count:number; retry_round:number; chunk_count:number; processing_error:string|null;
 }
 export type ChunkList = {items:{chunk_index:number;content:string;page_number:number|null;section_title:string|null;char_start:number;char_end:number}[];total:number;page:number;page_size:number;content_version:number;searchable:boolean;chunking_profile:string}
